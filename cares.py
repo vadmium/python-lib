@@ -1,13 +1,16 @@
 from __future__ import division
 
 import atexit
-import sys
 import math
+import weakref
 
 from ctypes import (
     CDLL,
     c_char_p, c_void_p, c_int, c_char, c_ushort, c_long,
     byref, CFUNCTYPE, POINTER, Structure,
+)
+from lib import (
+    exc_sink, weakmethod,
 )
 
 # Maybe platform-dependent?
@@ -45,14 +48,15 @@ def version():
 class Channel:
     def __init__(self, **options):
         self.channel = c_void_p()
-        self.host_callbacks = set()
+        self.host_callback_refs = set()
         
         opt_struct = Options()
         optmask = 0
         
         if "sock_state_cb" in options:
-            self.sock_state_cb = SockStateCb(options["sock_state_cb"])
-            opt_struct.sock_state_cb = self.sock_state_cb.c_func
+            self.sock_state_cb_ref = SockStateCb(options["sock_state_cb"]).\
+                cfunc()
+            opt_struct.sock_state_cb = self.sock_state_cb_ref
             opt_struct.sock_state_cb_data = None
             optmask ^= 1 << 9
         
@@ -63,9 +67,9 @@ class Channel:
         lib.ares_destroy(self.channel)
     
     def gethostbyname(self, name, family, callback):
+        callback = HostCallback().arm(self.host_callback_refs, callback)
         lib.ares_gethostbyname(self.channel, c_char_p(name.encode()),
-            c_int(family),
-            HostCallback(callback).arm(self.host_callbacks), None)
+            c_int(family), callback, None)
     
     # TODO: getnameinfo?
     
@@ -94,24 +98,17 @@ class Channel:
         f.restype = None
         f(self.channel, c_int(read_fd), c_int(write_fd))
 
-class CCallback:
+class SockStateCb:
     def __init__(self, callback):
         self.callback = callback
-        self.c_func = self.type(self.exc_trap)
     
-    def exc_trap(self, *args):
-        """
-        Trap all exceptions to avoid waking dragons in C-types-land
-        """
-        
-        try:
-            self.py_func(*args)
-        except:
-            sys.excepthook(*sys.exc_info())
-
-class SockStateCb(CCallback):
-    type = CFUNCTYPE(None, c_void_p, c_int, c_int, c_int)
-    def py_func(self, arg, s, read, write):
+    def cfunc(self):
+        return self.ctype(self)
+    
+    ctype = CFUNCTYPE(None, c_void_p, c_int, c_int, c_int)
+    
+    @exc_sink
+    def __call__(self, arg, s, read, write):
         self.callback(s, read, write)
 
 class Options(Structure):
@@ -129,24 +126,27 @@ class Options(Structure):
         ("domains", c_void_p,),
         ("ndomains", c_int,),
         ("lookups", c_void_p,),
-        ("sock_state_cb", SockStateCb.type,),
+        ("sock_state_cb", SockStateCb.ctype),
         ("sock_state_cb_data", c_void_p,),
         ("sortlist", c_void_p,),
         ("nsort", c_int,),
     )
 
-class HostCallback(CCallback):
-    type = CFUNCTYPE(None, c_void_p, c_int, c_int, POINTER(HostEnt))
-    
-    def arm(self, refs):
+class HostCallback:
+    def arm(self, refs, callback):
+        self.callback = callback
         refs.add(self)
-        self.refs = refs
-        return self.c_func
-    
-    def py_func(self, arg, status, timeouts, hostent):
+        self.refs = weakref.ref(refs)
+        
+        self.cfunc = CFUNCTYPE(None,
+            c_void_p, c_int, c_int, POINTER(HostEnt))(self.proxy)
+        return self.cfunc
+        
+    @weakmethod
+    @exc_sink
+    def proxy(self, arg, status, timeouts, hostent):
         # Assuming each callback is only ever called once
-        self.refs.remove(self)
-        del self.c_func # Break circular garbage reference
+        self.refs().remove(self)
         
         if status != 0:
             hostent = None
