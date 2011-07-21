@@ -1,3 +1,19 @@
+# PEP 380 "Syntax for delegating to a subgenerator" [yield from]:
+# http://www.python.org/dev/peps/pep-0380
+
+# Similar generator wrapper implementation:
+# http://mail.python.org/pipermail/python-dev/2010-July/102320.html
+
+# "Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1
+# apparently only compiles with Python 2.
+# http://www.weightless.io/
+
+import weakref
+
+from lib import (
+    weakmethod,
+)
+
 class Routine:
     """
     Runs an event-driven co-routine implemented as a generator. The generator
@@ -8,52 +24,69 @@ class Routine:
     """
     
     def __init__(self, routine):
-        #~ print(self, "*")
         self.routines = [routine]
-        self.bump()
+        try:
+            self.bump()
+        except:
+            self.close()
+            raise
     
-    def bump(self, *args):
-        call = Send(*args)
-        
+    @weakmethod
+    def wakeup(self, send=None):
+        self.event.close()
+        self.bump(send)
+    
+    def bump(self, send=None):
+        exc = None
         try:
             while self.routines:
                 try:
-                    obj = call(self.routines[-1])
-                except StopIteration as stop:
-                    self.routines.pop()
-                    call = Send(*stop.args)
+                    current = self.routines[-1]
+                    if exc is not None:
+                        # Traceback from first parameter apparently ignored
+                        obj = (
+                            current.throw(type(exc), exc, exc.__traceback__))
+                    elif send is not None:
+                        obj = current.send(send)
+                    else:
+                        obj = next(current)
                 except BaseException as e:
                     self.routines.pop()
-                    call = Throw(e)
+                    if isinstance(e, StopIteration):
+                        exc = None
+                        if e.args:
+                            send = e.args[0]
+                        else:
+                            send = None
+                    else:
+                        # Saving exception creates circular reference
+                        exc = e
                 else:
                     if isinstance(obj, Event):
-                        obj.arm(self.bump)
+                        self.event = obj
+                        self.event.arm(self.wakeup)
                         return
                     else:
                         self.routines.append(obj)
-                        call = Send()
+                        exc = None
+                        send = None
             
-            return call.close()
+            if exc is not None:
+                raise exc
+            else:
+                return send
         finally:
-            # Break circular reference if call references exception traceback
-            del call
-
-class Send:
-    def __init__(self, arg=None):
-        self.arg = arg
-    def __call__(self, routine):
-        return routine.send(self.arg)
+            # Break circular reference if traceback includes this function
+            del exc
+    
     def close(self):
-        return self.arg
-
-class Throw:
-    def __init__(self, exc):
-        self.exc = exc
-    def __call__(self, routine):
-        # Traceback already in the exception object apparently ignored
-        return routine.throw(self.exc, None, self.exc.__traceback__)
-    def close(self):
-        raise self.exc
+        if self.routines:
+            self.event.close()
+            while self.routines:
+                self.routines.pop().close()
+    
+    def __repr__(self):
+        return "<{} {:#x}>".format(type(self).__name__, id(self))
 
 class Event:
     """
@@ -61,7 +94,9 @@ class Event:
     Subclasses should provide an Event.arm(callback) method which registers
     an object to call when the event is triggered.
     """
-    pass
+    
+    def close(self):
+        pass
 
 class Queue(Event):
     """
@@ -74,13 +109,14 @@ class Queue(Event):
     def arm(self, callback):
         self.callback = callback
     
-    def put(self, arg=None):
-        callback = self.callback
-        if callback:
-            self.callback = None
-            callback(arg)
+    def close(self):
+        self.callback = None
+    
+    def put(self, *args):
+        if self.callback is not None:
+            self.callback(*args)
         else:
-            self.queue.append(arg)
+            self.queue.append(args)
     
     def get(self):
         """
@@ -90,13 +126,49 @@ class Queue(Event):
         try:
             raise StopIteration(self.queue.pop(0))
         except IndexError:
-            raise StopIteration((yield self))
+            pass # Avoid yielding in exception handler
+        raise StopIteration((yield self))
 
-#~ class Callback(Event):
-    #~ """
-    #~ An Event object that is callable.
-    #~ """
-    #~ def arm(self, callback):
-        #~ self.callback = callback
-    #~ def __call__(self, *args, **kw):
-        #~ self.callback(*args, **kw)
+class EventSet(Event):
+    """
+    A composite event that is triggered by any sub-event in a set
+    """
+    
+    def __init__(self, set=()):
+        self.set = []
+        for event in set:
+            self.add(event)
+    
+    def add(self, event):
+        self.set.append(Subevent(weakref.ref(self), event))
+    
+    def arm(self, callback):
+        self.callback = callback
+        try:
+            for e in self.set:
+                e.event.arm(e.trigger)
+        except:
+            i = iter(self.set)
+            while True:
+                ee = next(i)
+                if ee is e:
+                    break
+                ee.close()
+            raise
+    
+    def close(self):
+        for e in self.set:
+            e.event.close()
+    
+    def __repr__(self):
+        return "<{}([{}])>".format(
+            type(self).__name__, ", ".join(str(e.event) for e in self.set))
+
+class Subevent:
+    def __init__(self, set, event):
+        self.set = set
+        self.event = event
+    
+    @weakmethod
+    def trigger(self, args):
+        self.set().callback((self.event, args))
