@@ -98,6 +98,15 @@ class Event:
     def close(self):
         pass
 
+class class_:
+    """Decorator wrapper for classes whose __init__ method is a coroutine"""
+    def __init__(self, cls):
+        self.cls = cls
+    def __call__(self, *args, **kw):
+        o = self.cls.__new__(self.cls, *args, **kw)
+        yield o.__init__(*args, **kw)
+        raise StopIteration(o)
+
 class Queue(Event):
     """
     An event that may be triggered before it is armed.
