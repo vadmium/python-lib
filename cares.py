@@ -1,5 +1,7 @@
 from __future__ import division
 
+# C-ares library man pages: http://c-ares.haxx.se/docs.html
+
 import atexit
 import math
 import weakref
@@ -12,9 +14,14 @@ from ctypes import (
 from lib import (
     exc_sink, weakmethod,
 )
+from collections import namedtuple
 
-# Maybe platform-dependent?
-class HostEnt(Structure):
+import socket
+globals().update((k, v)
+    for (k, v) in vars(socket).items() if k.startswith("AF_"))
+
+# Standard <netdb.h> structure
+class HostEntC(Structure):
     _fields_ = (
         ("h_name", c_char_p,),
         ("h_aliases", POINTER(c_char_p),),
@@ -22,6 +29,8 @@ class HostEnt(Structure):
         ("h_length", c_int,),
         ("h_addr_list", POINTER(POINTER(c_char)),),
     )
+HostEnt = namedtuple("HostEnt",
+    (k[len("h_"):] for (k, *_) in HostEntC._fields_))
 
 lib = CDLL("libcares.so.2")
 
@@ -53,9 +62,12 @@ class Channel:
         opt_struct = Options()
         optmask = 0
         
-        if "sock_state_cb" in options:
-            self.sock_state_cb_ref = SockStateCb(options["sock_state_cb"]).\
-                cfunc()
+        try:
+            self.sock_state_cb_ref = (
+                SockStateCb(options["sock_state_cb"]).cfunc())
+        except LookupError:
+            pass
+        else:
             opt_struct.sock_state_cb = self.sock_state_cb_ref
             opt_struct.sock_state_cb_data = None
             optmask ^= 1 << 9
@@ -139,7 +151,7 @@ class HostCallback:
         self.refs = weakref.ref(refs)
         
         self.cfunc = CFUNCTYPE(None,
-            c_void_p, c_int, c_int, POINTER(HostEnt))(self.proxy)
+            c_void_p, c_int, c_int, POINTER(HostEntC))(self.proxy)
         return self.cfunc
         
     @weakmethod
@@ -156,12 +168,12 @@ class HostCallback:
                 addr = hostent.contents.h_addr_list[len(addr_list)]
                 if not addr:
                     break
-                addr_list.append(bytes(addr[:4]))
-            hostent=dict(
+                addr_list.append(bytes(addr[:hostent.contents.h_length]))
+            hostent = HostEnt(
                 name=hostent.contents.h_name,
-                #~ h_aliases=
+                aliases=NotImplemented,
                 addrtype=hostent.contents.h_addrtype,
-                #~ h_length=hostent.contents.h_length,
+                length=hostent.contents.h_length,
                 addr_list=addr_list,
             )
         
