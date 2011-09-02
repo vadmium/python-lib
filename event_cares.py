@@ -2,6 +2,7 @@ from PyQt4 import QtCore
 import event
 import cares
 import math
+from socket import AF_UNSPEC
 
 def resolve(name):
     self = ResolveContext()
@@ -11,7 +12,7 @@ def resolve(name):
     
     channel = cares.Channel(sock_state_cb=self.sock_state)
     
-    channel.gethostbyname(name, 0, self.host)
+    channel.gethostbyname(name, AF_UNSPEC, self.host)
     while self.status is None:
         events = event.EventSet()
         
@@ -33,8 +34,7 @@ def resolve(name):
             fds[trigger.note.type()] = fd
         channel.process_fd(fds[self.read], fds[self.write])
     cares.check(self.status)
-    raise StopIteration(
-        (self.hostent["addrtype"], self.hostent["addr_list"][0],))
+    raise StopIteration((self.hostent.addrtype, self.hostent.addr_list[0]))
 
 class ResolveContext:
     read = QtCore.QSocketNotifier.Read

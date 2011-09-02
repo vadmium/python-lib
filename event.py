@@ -98,7 +98,7 @@ class Event:
     def close(self):
         pass
 
-class class_:
+class constructor:
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
     def __init__(self, cls):
         self.cls = cls
