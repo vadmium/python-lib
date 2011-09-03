@@ -15,6 +15,7 @@ from lib import (
     exc_sink, weakmethod,
 )
 from collections import namedtuple
+from socket import inet_ntop
 
 import socket
 globals().update((k, v)
@@ -47,7 +48,7 @@ def check(res):
 def strerror(res):
     f = lib.ares_strerror
     f.restype = c_char_p
-    return f(res)
+    return f(res).decode()
 
 def version():
     f = lib.ares_version
@@ -168,7 +169,8 @@ class HostCallback:
                 addr = hostent.contents.h_addr_list[len(addr_list)]
                 if not addr:
                     break
-                addr_list.append(bytes(addr[:hostent.contents.h_length]))
+                addr_list.append(inet_ntop(hostent.contents.h_addrtype,
+                    addr[:hostent.contents.h_length]))
             hostent = HostEnt(
                 name=hostent.contents.h_name,
                 aliases=NotImplemented,
