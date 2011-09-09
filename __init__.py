@@ -148,3 +148,8 @@ def path_split(path):
     for component in path.split("/"):
         if component:
             yield component
+
+def skip(s, c):
+    if not s.startswith(c):
+        raise ValueError("Expected {0!r} in string".format(c))
+    return s[len(c):]
