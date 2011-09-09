@@ -6,7 +6,11 @@ def transplant(path, old="/", new=""):
         try:
             path_dir = next(path_dirs)
         except StopIteration:
-            raise ValueError("{0} is an ancestor of {1}".format(path, old))
+            if not path and root_dir == "/":
+                raise ValueError("Null path not relative to {0}".format(old))
+            else:
+                raise ValueError(
+                    "{0} is an ancestor of {1}".format(path, old))
         if path_dir != root_dir:
             raise ValueError("{0} is not relative to {1}".format(path, old))
     
