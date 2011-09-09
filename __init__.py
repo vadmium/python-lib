@@ -231,5 +231,34 @@ def fields(f, *args, **kw):
     f.__dict__.update(*args, **kw)
     return f
 
+class Cleanup:
+    def __init__(self):
+        self.exits = []
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *exc):
+        while self.exits:
+            if self.exits.pop()(*exc):
+                exc = (None, None, None)
+        return exc == (None, None, None)
+    
+    def add(self, context):
+        exit = context.__exit__
+        enter = context.__enter__
+        
+        pos = len(self.exits)
+        self.exits.append(null)
+        try:
+            res = enter()
+        finally:
+            if "res" in locals():
+                self.exits[pos] = exit
+        return res
+
+def null(*args, **kw):
+    pass
+
 def nop(*args, **kw):
     pass
