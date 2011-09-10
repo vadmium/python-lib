@@ -56,3 +56,6 @@ def Field(**kw):
 def itemkey(item):
     (key, value) = item
     return key
+
+def bitmask(size):
+    return ~(~0 << size)
