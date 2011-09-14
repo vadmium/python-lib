@@ -14,7 +14,7 @@ from lib import (
     weakmethod,
 )
 
-class Routine:
+def Routine(routine, group=None):
     """
     Runs an event-driven co-routine implemented as a generator. The generator
     can yield:
@@ -23,8 +23,16 @@ class Routine:
     parent co-routine is continued
     """
     
-    def __init__(self, routine):
+    if group is None:
+        group = Group()
+    RoutineCls(routine, group)
+    return group
+
+class RoutineCls:
+    def __init__(self, routine, group):
         self.routines = [routine]
+        self.group = weakref.ref(group)
+        self.group().set.add(self)
         try:
             self.bump()
         except:
@@ -71,6 +79,7 @@ class Routine:
                         exc = None
                         send = None
             
+            self.close()
             if exc is not None:
                 raise exc
             else:
@@ -84,9 +93,22 @@ class Routine:
             self.event.close()
             while self.routines:
                 self.routines.pop().close()
+        try:
+            self.group().set.remove(self)
+        except (ReferenceError, LookupError):
+            pass
+    
+    __del__ = close
     
     def __repr__(self):
         return "<{} {:#x}>".format(type(self).__name__, id(self))
+
+class Group:
+    def __init__(self):
+        self.set = set()
+    def close(self):
+        for i in list(self.set):
+            i.close()
 
 class Event:
     """
