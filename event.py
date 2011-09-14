@@ -38,12 +38,18 @@ class RoutineCls:
             raise
     
     @weakmethod
-    def wakeup(self, send=None):
+    def wakeup(self, *args, **kw):
         self.event.close()
-        self.bump(send)
+        self.bump(*args, **kw)
     
-    def bump(self, send=None):
-        exc = None
+    def bump(self, send=None, exc=None):
+        if exc is not None:
+            try:
+                tb = exc.__traceback__
+            except AttributeError:
+                tb = None
+            exc = (type(exc), exc, tb)
+        
         try:
             while self.routines:
                 try:
@@ -143,11 +149,14 @@ class Queue(Event):
     def close(self):
         self.callback = None
     
-    def put(self, *args):
+    def put(self, value=None, exc=None):
         if self.callback is not None:
-            self.callback(*args)
+            print(value, exc)
+            self.callback(send=value, exc=exc)
         else:
-            self.queue.append(args)
+            if exc is None:
+                exc = StopIteration(value)
+            self.queue.append(exc)
     
     def get(self):
         """
@@ -155,9 +164,11 @@ class Queue(Event):
         are no triggered events already pending.
         """
         try:
-            raise StopIteration(self.queue.pop(0))
+            exc = self.queue.pop(0)
         except IndexError:
             pass # Avoid yielding in exception handler
+        else:
+            raise exc
         raise StopIteration((yield self))
 
 class EventSet(Event):
