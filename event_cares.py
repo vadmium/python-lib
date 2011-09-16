@@ -28,7 +28,7 @@ def resolve(name, family=AF_UNSPEC):
         (trigger, args) = (yield events)
         timer.stop()
         
-        fds = {x: None for x in self.sockops}
+        fds = dict.fromkeys(self.sockops)
         if isinstance(trigger, SocketEvent):
             (fd,) = args
             fds[trigger.note.type()] = fd
@@ -43,7 +43,7 @@ class ResolveContext:
     
     def __init__(self):
         self.status = None
-        self.socks = {x: set() for x in self.sockops}
+        self.socks = dict((x, set()) for x in self.sockops)
     
     def sock_state(self, s, read, write):
         for op in self.sockops:

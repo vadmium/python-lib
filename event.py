@@ -9,10 +9,8 @@
 # http://www.weightless.io/
 
 import weakref
-
-from lib import (
-    weakmethod,
-)
+from lib import weakmethod
+from sys import exc_info
 
 def Routine(routine, group=None):
     """
@@ -50,10 +48,9 @@ class RoutineCls:
             while self.routines:
                 try:
                     current = self.routines[-1]
-                    if exc is not None:
+                    if exc:
                         # Traceback from first parameter apparently ignored
-                        obj = (
-                            current.throw(type(exc), exc, exc.__traceback__))
+                        obj = current.throw(*exc)
                     elif send is not None:
                         obj = current.send(send)
                     else:
@@ -68,7 +65,7 @@ class RoutineCls:
                             send = None
                     else:
                         # Saving exception creates circular reference
-                        exc = e
+                        exc = exc_info()
                 else:
                     if isinstance(obj, Event):
                         self.event = obj
@@ -80,8 +77,11 @@ class RoutineCls:
                         send = None
             
             self.close()
-            if exc is not None:
-                raise exc
+            if exc:
+                raise exc[1]
+                
+                #~ # Alternative for Python 2, to include traceback
+                #~ raise exc[0], exc[1], exc[2]
             else:
                 return send
         finally:
