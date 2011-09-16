@@ -31,7 +31,7 @@ class HostEntC(Structure):
         ("h_addr_list", POINTER(POINTER(c_char)),),
     )
 HostEnt = namedtuple("HostEnt",
-    (k[len("h_"):] for (k, *_) in HostEntC._fields_))
+    (k[len("h_"):] for (k, _) in HostEntC._fields_))
 
 lib = CDLL("libcares.so.2")
 
