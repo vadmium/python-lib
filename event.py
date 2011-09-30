@@ -126,14 +126,16 @@ class Event:
     def close(self):
         pass
 
-class constructor:
-    """Decorator wrapper for classes whose __init__ method is a coroutine"""
-    def __init__(self, cls):
-        self.cls = cls
-    def __call__(self, *args, **kw):
-        o = self.cls.__new__(self.cls, *args, **kw)
-        yield o.__init__(*args, **kw)
-        raise StopIteration(o)
+class Callback(Event):
+    """
+    A simple event triggered by calling it.
+    """
+    def arm(self, callback):
+        self.callback = callback
+    def close(self):
+        del self.callback
+    def __call__(self, value=None, exc=None):
+        self.callback(send=value, exc=exc)
 
 class Queue(Event):
     """
@@ -151,7 +153,6 @@ class Queue(Event):
     
     def put(self, value=None, exc=None):
         if self.callback is not None:
-            print(value, exc)
             self.callback(send=value, exc=exc)
         else:
             if exc is None:
@@ -214,3 +215,12 @@ class Subevent:
     @weakmethod
     def trigger(self, args):
         self.set().callback((self.event, args))
+
+class constructor:
+    """Decorator wrapper for classes whose __init__ method is a coroutine"""
+    def __init__(self, cls):
+        self.cls = cls
+    def __call__(self, *args, **kw):
+        o = self.cls.__new__(self.cls, *args, **kw)
+        yield o.__init__(*args, **kw)
+        raise StopIteration(o)
