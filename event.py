@@ -224,3 +224,36 @@ class constructor:
         o = self.cls.__new__(self.cls, *args, **kw)
         yield o.__init__(*args, **kw)
         raise StopIteration(o)
+
+class Lock(object):
+    def __init__(self):
+        self.locked = False
+        self.waiting = []
+    def __call__(self):
+        lock = LockContext(self)
+        stop = StopIteration(lock)
+        
+        if self.locked:
+            our_turn = Callback()
+            self.waiting.append(our_turn)
+            yield our_turn
+        try:
+            self.locked = True
+            raise stop
+        except BaseException as e:
+            if e is not stop:
+                lock.__exit__()
+            raise
+
+class LockContext(object):
+    def __init__(self, lock):
+        self.lock = lock
+    def  __enter__(self):
+        pass
+    def __exit__(self, *exc):
+        try:
+            next_turn = self.lock.waiting.pop()
+        except LookupError:
+            self.lock.locked = False
+        else:
+            next_turn()
