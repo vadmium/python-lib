@@ -5,10 +5,14 @@ from sys import stderr
 from lib import Function
 
 class traced(Function):
-    def __init__(self, func, abbrev=set()):
+    def __init__(self, func, name=None, abbrev=set()):
         self.func = func
-        self.name = func.__name__
+        if name is None:
+            self.name = func.__name__
+        else:
+            self.name = name
         self.abbrev = abbrev
+    
     def __call__(self, *args, **kw):
         print(self.name, end="(", file=stderr)
         
@@ -44,3 +48,7 @@ class traced(Function):
 
 def trace(func, *args, **kw):
     traced(func)(*args, **kw)
+def tracer(name):
+    return traced(nop, name=name, abbrev=set(("return",)))
+def nop(*args, **kw):
+    pass
