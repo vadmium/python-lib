@@ -44,10 +44,12 @@ class traced(Function):
             comma = True
         
         print(end=")", file=stderr)
-        indent += 1
         stderr.flush()
-        ret = self.func(*args, **kw)
-        indent -= 1
+        indent += 1
+        try:
+            ret = self.func(*args, **kw)
+        finally:
+            indent -= 1
         
         if "return" in self.abbrev:
             v = "..."
