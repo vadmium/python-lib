@@ -27,20 +27,32 @@ class traced(Function):
         indent += 1
         try:
             ret = self.func(*args, **kw)
-        finally:
-            indent -= 1
+        except BaseException as exc:
+            self.print_result("raise", exc)
+            raise
+        else:
+            self.print_result("return", ret, "->")
+            return ret
+    
+    def print_result(self, key, v, disp=None):
+        global startline
+        global indent
         
-        if "return" in self.abbrev:
+        indent -= 1
+        
+        if disp is None:
+            disp = key
+        
+        if key in self.abbrev:
             v = "..."
         else:
-            v = repr(ret)
+            v = repr(v)
         if startline:
             margin(stderr)
         else:
             stderr.write(" ")
-        print("->", v, file=stderr)
+        print(disp, v, file=stderr)
         startline = True
-        return ret
 
 def trace(func, *args, **kw):
     return traced(func)(*args, **kw)
