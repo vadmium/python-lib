@@ -11,6 +11,7 @@
 import weakref
 from lib import weakmethod
 from sys import exc_info
+from lib import Record
 
 def Routine(routine, group=None):
     """
@@ -143,7 +144,7 @@ class Queue(Event):
     """
     def __init__(self):
         self.callback = None
-        self.queue = []
+        self.queue = list()
     
     def arm(self, callback):
         self.callback = callback
@@ -151,28 +152,35 @@ class Queue(Event):
     def close(self):
         self.callback = None
     
-    def put(self, value=None, exc=None):
+    def send(self, value=None):
+        self.queue.append(Record(exc=None, ret=value))
         if self.callback is not None:
-            self.callback(send=value, exc=exc)
-        else:
-            if exc is None:
-                exc = StopIteration(value)
-            self.queue.append(exc)
+            self.callback()
     
-    def get(self):
-        """
-        Sub-co-routine that will wait for the event to be triggered if there
-        are no triggered events already pending.
-        """
+    def throw(self, exc):
+        self.queue.append(Record(exc=exc))
+        if self.callback is not None:
+            self.callback()
+    
+    def __call__(self, *args):
+        return self.send(args)
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
         try:
-            exc = self.queue.pop(0)
+            item = self.queue.pop(0)
         except LookupError:
-            pass # Avoid yielding in exception handler
+            raise StopIteration()
+        
+        if item.exc is None:
+            return item.ret
         else:
-            raise exc
-        raise StopIteration((yield self))
+            raise item.exc
+    next = __next__
     
-    def waiting(self):
+    def __len__(self):
         """Return the number of messages waiting in the queue"""
         return len(self.queue)
 
