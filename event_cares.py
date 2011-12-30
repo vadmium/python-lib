@@ -14,7 +14,7 @@ def resolve(name, family=AF_UNSPEC):
     
     channel.gethostbyname(name, family, self.host)
     while self.status is None:
-        events = event.EventSet()
+        events = event.Any()
         
         timeout = channel.timeout()
         if timeout is not None:

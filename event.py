@@ -176,7 +176,7 @@ class Queue(Event):
         """Return the number of messages waiting in the queue"""
         return len(self.queue)
 
-class EventSet(Event):
+class Any(Event):
     """
     A composite event that is triggered by any sub-event in a set
     """
