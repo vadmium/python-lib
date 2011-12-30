@@ -21,29 +21,8 @@ class traced(Function):
             print(file=stderr)
         margin(stderr)
         startline = False
-        print(self.name, end="(", file=stderr)
         
-        for (k, v) in enumerate(args):
-            if k:
-                print(", ", end="", file=stderr)
-            if k in self.abbrev:
-                v = "..."
-            else:
-                v = repr(v)
-            print(v, end="", file=stderr)
-        
-        comma = bool(args)
-        for (k, v) in kw.items():
-            if comma:
-                stderr.write(", ")
-            if k in self.abbrev:
-                v = "..."
-            else:
-                v = repr(v)
-            stderr.write("{0}={1}".format(k, v))
-            comma = True
-        
-        print(end=")", file=stderr)
+        print_call(self.name, args, kw, self.abbrev)
         stderr.flush()
         indent += 1
         try:
@@ -69,6 +48,31 @@ def tracer(name):
     return traced(nop, name=name, abbrev=set(("return",)))
 def nop(*args, **kw):
     pass
+
+def print_call(name, args, kw, abbrev=set()):
+    print(name, end="(", file=stderr)
+    
+    for (k, v) in enumerate(args):
+        if k:
+            stderr.write(", ")
+        if k in abbrev:
+            v = "..."
+        else:
+            v = repr(v)
+        stderr.write(v)
+    
+    comma = bool(args)
+    for (k, v) in kw.items():
+        if comma:
+            stderr.write(", ")
+        if k in abbrev:
+            v = "..."
+        else:
+            v = repr(v)
+        stderr.write("{0}={1}".format(k, v))
+        comma = True
+    
+    stderr.write(")")
 
 indent = 0
 startline = True
