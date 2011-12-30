@@ -116,7 +116,7 @@ class Group:
         for i in list(self.set):
             i.close()
 
-class Event:
+class Event(object):
     """
     Base class for events that a co-routine can wait on by yielding.
     Subclasses should provide an Event.arm(callback) method which registers
@@ -208,7 +208,7 @@ class EventSet(Event):
             e.event.close()
     
     def __repr__(self):
-        return "<{}([{}])>".format(
+        return "<{0}([{1}])>".format(
             type(self).__name__, ", ".join(str(e.event) for e in self.set))
 
 class Subevent:
