@@ -217,8 +217,8 @@ class Subevent:
         self.event = event
     
     @weakmethod
-    def trigger(self, args):
-        self.set().callback((self.event, args))
+    def trigger(self, send=None, exc=None):
+        self.set().callback(send=(self.event, send), exc=exc)
 
 class constructor:
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
