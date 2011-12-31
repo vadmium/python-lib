@@ -2,6 +2,9 @@ from __future__ import division
 
 # C-ares library man pages: http://c-ares.haxx.se/docs.html
 
+# See also:
+# http://pyuv.readthedocs.org/en/latest/dns.html
+
 import atexit
 import math
 import weakref
