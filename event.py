@@ -139,7 +139,7 @@ class Callback(Event):
 
 class Queue(Event):
     """
-    An event that may be triggered before it is armed.
+    An event that may be triggered before it is armed (message queue).
     """
     def __init__(self):
         self.callback = None
@@ -166,11 +166,15 @@ class Queue(Event):
         """
         try:
             exc = self.queue.pop(0)
-        except IndexError:
+        except LookupError:
             pass # Avoid yielding in exception handler
         else:
             raise exc
         raise StopIteration((yield self))
+    
+    def waiting(self):
+        """Return the number of messages waiting in the queue"""
+        return len(self.queue)
 
 class EventSet(Event):
     """
