@@ -234,20 +234,14 @@ class Lock(object):
         self.locked = False
         self.waiting = []
     def __call__(self):
-        lock = LockContext(self)
-        stop = StopIteration(lock)
+        cascade = LockContext(self).cascade()
         
         if self.locked:
             our_turn = Callback()
             self.waiting.append(our_turn)
             yield our_turn
-        try:
+        with cascade:
             self.locked = True
-            raise stop
-        except BaseException as e:
-            if e is not stop:
-                lock.__exit__()
-            raise
 
 class LockContext(object):
     def __init__(self, lock):
@@ -261,3 +255,19 @@ class LockContext(object):
             self.lock.locked = False
         else:
             next_turn()
+    
+    def cascade(self):
+        """Return context manager that releases lock on exception, otherwise
+        returns the context via StopIteration"""
+        return LockCascade(self)
+
+class LockCascade(object):
+    def __init__(self, context):
+        self.context = context
+    def __enter__(self):
+        pass
+    def __exit__(self, *exc):
+        if exc != (None, None, None):
+            if not self.context.__exit__(*exc):
+                return False
+        raise StopIteration(self.context)
