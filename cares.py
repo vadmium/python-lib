@@ -14,10 +14,9 @@ from ctypes import (
     c_char_p, c_void_p, c_int, c_char, c_ushort, c_long,
     byref, CFUNCTYPE, POINTER, Structure,
 )
-from lib import (
-    exc_sink, weakmethod,
-)
-from collections import namedtuple
+from lib import exc_sink
+from lib import weakmethod
+from lib import Record
 from socket import inet_ntop
 
 import socket
@@ -33,8 +32,6 @@ class HostEntC(Structure):
         ("h_length", c_int,),
         ("h_addr_list", POINTER(POINTER(c_char)),),
     )
-HostEnt = namedtuple("HostEnt",
-    (k[len("h_"):] for (k, _) in HostEntC._fields_))
 
 lib = CDLL("libcares.so.2")
 
@@ -174,7 +171,7 @@ class HostCallback:
                     break
                 addr_list.append(inet_ntop(hostent.contents.h_addrtype,
                     addr[:hostent.contents.h_length]))
-            hostent = HostEnt(
+            hostent = Record(
                 name=hostent.contents.h_name,
                 aliases=NotImplemented,
                 addrtype=hostent.contents.h_addrtype,
