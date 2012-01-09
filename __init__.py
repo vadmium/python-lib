@@ -7,6 +7,7 @@ import os
 from types import MethodType
 from functools import partial
 from functools import update_wrapper
+from collections import namedtuple
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -256,3 +257,8 @@ class Cleanup:
 
 def nop(*args, **kw):
     pass
+
+FieldType = namedtuple("Field", "key, value")
+def Field(**kw):
+    (field,) = kw.items()
+    return FieldType(*field)
