@@ -1,6 +1,37 @@
+from __future__ import print_function
+
 from lib import event
 from lib import cares
-from socket import AF_UNSPEC
+from socket import (SOCK_STREAM, AF_UNSPEC, AF_INET, AF_INET6)
+from event_socket import Socket
+from sys import stderr
+
+def name_connect(event_driver, hostname, port, type=SOCK_STREAM):
+    sock = None
+    
+    for family in (AF_UNSPEC, AF_INET6, AF_INET):
+        try:
+            hostent = (yield resolve(event_driver, hostname, family))
+        except EnvironmentError as e:
+            print(e, file=stderr)
+            continue
+        
+        sock = Socket(event_driver, hostent.addrtype, type)
+        
+        for addr in hostent.addr_list:
+            try:
+                yield sock.connect((addr, port))
+            except EnvironmentError as e:
+                print(e, file=stderr)
+                continue
+            raise StopIteration(sock)
+    
+    else:
+        if sock is None:
+            raise EnvironmentError("Failure resolving {0}".format(hostname))
+        else:
+            raise EnvironmentError("All addresses unconnectable: {0}".format(
+                hostname))
 
 def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(event_driver)
