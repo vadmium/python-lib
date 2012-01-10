@@ -5,6 +5,7 @@ from sys import modules
 from sys import argv
 import os
 from types import MethodType
+from urllib.parse import urlsplit
 
 try:
     import builtins
@@ -154,3 +155,17 @@ def strip(s, start="", end=""):
         raise ValueError(
             "String not enclosed by {0!r} and {1!r}".format(start, end))
     return s[len(start):len(s) - len(end)]
+
+def url_port(url, scheme, ports):
+    parsed = urlsplit(url, scheme=scheme)
+    if not parsed.hostname:
+        parsed = urlsplit("//" + url, scheme=scheme)
+    if not parsed.hostname:
+        raise ValueError("No host name specified: {0}".format(url))
+    
+    def_port = ports[parsed.scheme]
+        #~ raise ValueError("Unhandled scheme: {}".format(parsed.scheme))
+    port = parsed.port
+    if port is None:
+        port = def_port
+    return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port)
