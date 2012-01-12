@@ -5,23 +5,23 @@ from itertools import compress
 
 def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(event_driver)
-    timer = event_driver.Timer(event.Callback())
+    timer = event_driver.Timer()
     
     channel = cares.Channel(sock_state_cb=self.sock_state)
     
     channel.gethostbyname(name, family, self.host)
     while self.status is None:
-        events = event.Any(w.callback for w in self.watchers.values())
+        events = event.Any(watcher for watcher in self.watchers.values())
         
         timeout = channel.timeout()
         if timeout is not None:
             timer.start(timeout)
-            events.add(timer.callback)
+            events.add(timer)
         
         (trigger, args) = (yield events)
         timer.stop()
         
-        if trigger is timer.callback:
+        if trigger is timer:
             channel.process_fd(*(None for op in self.ops))
         else:
             (fd, ops) = args
@@ -42,7 +42,7 @@ class ResolveContext:
             try:
                 watcher = self.watchers[s]
             except LookupError:
-                watcher = self.event_driver.FileWatcher(s, event.Callback())
+                watcher = self.event_driver.FileWatcher(s)
                 self.watchers[s] = watcher
             watcher.watch(compress(self.ops, ops))
         else:
