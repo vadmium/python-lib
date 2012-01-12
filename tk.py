@@ -32,6 +32,14 @@ class FileEvent(event.Event):
     def watch(self, ops):
         self.ops = reduce(or_, ops)
     
+    def writable(self):
+        self.ops = EventDriver.WRITE
+        return self
+    
+    def readable(self):
+        self.ops = EventDriver.READ
+        return self
+    
     def arm(self, *args, **kw):
         event.Event.arm(self, *args, **kw)
         self.tk.createfilehandler(self.fd, self.ops, self.handler)
