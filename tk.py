@@ -2,6 +2,7 @@ from functools import partial
 from functools import reduce
 from operator import or_
 from math import ceil
+from . import event
 import tkinter
 from tkinter.ttk import Label
 
@@ -22,29 +23,40 @@ class EventDriver(object):
     def Timer(self, *args, **kw):
         return Timer(self.tk, *args, **kw)
 
-class FileWatcher(object):
-    def __init__(self, widget, fd, callback):
-        self.widget = widget
+class FileWatcher(event.Event):
+    def __init__(self, widget, fd):
+        self.tk = widget.tk
         self.fd = fd
-        self.callback = callback
+        event.Event.__init__(self)
     
     def watch(self, ops):
-        self.widget.tk.createfilehandler(self.fd, reduce(or_, ops),
-            self.handler)
+        self.ops = reduce(or_, ops)
     
-    def destroy(self):
-        self.widget.tk.deletefilehandler(self.fd)
+    def arm(self, *args, **kw):
+        event.Event.arm(self, *args, **kw)
+        self.tk.createfilehandler(self.fd, self.ops, self.handler)
+    
+    def close(self, *args, **kw):
+        self.tk.deletefilehandler(self.fd)
+        event.Event.close(self, *args, **kw)
     
     def handler(self, fd, mask):
-        self.callback(fd, mask)
+        if self.callback is not None:
+            return self.callback((fd, set(op for op in
+                (EventDriver.READ, EventDriver.WRITE) if mask & op)))
 
-class Timer(object):
-    def __init__(self, widget, callback):
+class Timer(event.Event):
+    def __init__(self, widget):
         self.widget = widget
-        self.callback = callback
+        event.Event.__init__(self)
+        self.timer = None
     
     def start(self, timeout):
-        self.timer = self.widget.after(ceil(timeout * 1000), self.callback)
+        self.timer = self.widget.after(ceil(timeout * 1000), self.handler)
     
     def stop(self):
         self.widget.after_cancel(self.timer)
+    
+    def handler(self):
+        if self.callback is not None:
+            return self.callback()
