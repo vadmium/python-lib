@@ -1,23 +1,17 @@
-from PyQt4 import QtCore
 import socket
 import ssl
 import errno
 
 class Socket:
     """
-    Wraps a Python socket and corresponding QT read and write notification
-    events. Provides co-routines for common blocking socket operations,
-    intended for use with the event.Routine class.
+    Wraps a Python socket. Provides co-routines for common blocking socket
+    operations, intended for use with the event.Routine class.
     """
     
-    def __init__(self, *args, **kw):
+    def __init__(self, event_driver, *args, **kw):
         self.sock = socket.socket(*args, **kw)
         self.sock.setblocking(False)
-        
-        self.readable = \
-            SocketQtEvent(self.sock.fileno(), QtCore.QSocketNotifier.Read)
-        self.writable = \
-            SocketQtEvent(self.sock.fileno(), QtCore.QSocketNotifier.Write)
+        self.event = event_driver.FileEvent(self.sock.fileno())
     
     def connect(self, *args, **kw):
         while True:
@@ -28,7 +22,7 @@ class Socket:
                 if err.errno != errno.EINPROGRESS:
                     raise
                 # Avoid yielding in exception handler
-            yield self.writable
+            yield self.event.writable()
     
     def recv(self, *args, **kw):
         while True:
@@ -38,7 +32,7 @@ class Socket:
                 if err.args[0] != ssl.SSL_ERROR_WANT_READ:
                     raise
                 # Avoid yielding in exception handler
-            yield self.readable
+            yield self.event.readable()
     
     def send(self, data, *args, **kw):
         while data:
