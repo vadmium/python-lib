@@ -118,23 +118,22 @@ class Group:
             i.close()
 
 class Event(object):
-    """
-    Base class for events that a co-routine can wait on by yielding.
-    Subclasses should provide an Event.arm(callback) method which registers
-    an object to call when the event is triggered.
-    """
+    """Base class for events that a co-routine can wait on by yielding"""
+    def __init__(self):
+        self.callback = None
+    
+    def arm(self, callback):
+        """Registers an object to call when the event is triggered"""
+        self.callback = callback
     
     def close(self):
-        pass
+        """Cancel the effect of the "arm" method call"""
+        self.callback = None
 
 class Callback(Event):
     """
     A simple event triggered by calling it.
     """
-    def arm(self, callback):
-        self.callback = callback
-    def close(self):
-        del self.callback
     def __call__(self, value=None, exc=None):
         self.callback(send=value, exc=exc)
 
@@ -143,14 +142,8 @@ class Queue(Event):
     An event that may be triggered before it is armed (message queue).
     """
     def __init__(self):
-        self.callback = None
+        Event.__init__(self)
         self.queue = list()
-    
-    def arm(self, callback):
-        self.callback = callback
-    
-    def close(self):
-        self.callback = None
     
     def send(self, value=None):
         self.queue.append(Record(exc=None, ret=value))
@@ -190,6 +183,7 @@ class Any(Event):
     """
     
     def __init__(self, set=()):
+        Event.__init__(self)
         self.set = []
         for event in set:
             self.add(event)
@@ -198,7 +192,7 @@ class Any(Event):
         self.set.append(Subevent(weakref.ref(self), event))
     
     def arm(self, callback):
-        self.callback = callback
+        Event.arm(self, callback)
         try:
             for e in self.set:
                 e.event.arm(e.trigger)
@@ -214,6 +208,7 @@ class Any(Event):
     def close(self):
         for e in self.set:
             e.event.close()
+        Event.close(self)
     
     def __repr__(self):
         return "<{0}([{1}])>".format(
