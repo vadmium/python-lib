@@ -6,10 +6,13 @@ from socket import (SOCK_STREAM, AF_UNSPEC, AF_INET, AF_INET6)
 from event_socket import Socket
 from sys import stderr
 
-def name_connect(event_driver, hostname, port, type=SOCK_STREAM):
+def name_connect(event_driver, hostname, port, type=SOCK_STREAM,
+callback=None):
     sock = None
     
     for family in (AF_UNSPEC, AF_INET6, AF_INET):
+        if callback is not None:
+            callback.lookingup(hostname, family)
         try:
             hostent = (yield resolve(event_driver, hostname, family))
         except EnvironmentError as e:
@@ -19,6 +22,8 @@ def name_connect(event_driver, hostname, port, type=SOCK_STREAM):
         sock = Socket(event_driver, hostent.addrtype, type)
         
         for addr in hostent.addr_list:
+            if callback is not None:
+                callback.connecting(addr, port)
             try:
                 yield sock.connect((addr, port))
             except EnvironmentError as e:
