@@ -11,7 +11,7 @@ def resolve(event_driver, name, family=AF_UNSPEC):
     
     channel.gethostbyname(name, family, self.host)
     while self.status is None:
-        events = event.Any(watcher for watcher in self.watchers.values())
+        events = event.Any(self.files.values())
         
         timeout = channel.timeout()
         if timeout is not None:
@@ -33,20 +33,20 @@ class ResolveContext:
     def __init__(self, event_driver):
         self.event_driver = event_driver
         self.status = None
-        self.watchers = dict()  # File watchers by file descriptor
+        self.files = dict()  # File events by file descriptor
         self.ops = (self.event_driver.READ, self.event_driver.WRITE)
     
     def sock_state(self, s, *ops):
         if any(ops):
             try:
-                watcher = self.watchers[s]
+                event = self.files[s]
             except LookupError:
-                watcher = self.event_driver.FileWatcher(s)
-                self.watchers[s] = watcher
-            watcher.watch(compress(self.ops, ops))
+                event = self.event_driver.FileEvent(s)
+                self.files[s] = event
+            event.watch(compress(self.ops, ops))
         else:
             try:
-                del self.watchers[s]
+                del self.files[s]
             except LookupError:
                 pass
     
