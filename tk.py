@@ -17,13 +17,13 @@ class EventDriver(object):
     def __init__(self, tk):
         self.tk = tk
     
-    def FileWatcher(self, *args, **kw):
-        return FileWatcher(self.tk, *args, **kw)
+    def FileEvent(self, *args, **kw):
+        return FileEvent(self.tk, *args, **kw)
     
     def Timer(self, *args, **kw):
         return Timer(self.tk, *args, **kw)
 
-class FileWatcher(event.Event):
+class FileEvent(event.Event):
     def __init__(self, widget, fd):
         self.tk = widget.tk
         self.fd = fd
