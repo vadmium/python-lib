@@ -134,8 +134,11 @@ class Callback(Event):
     """
     A simple event triggered by calling it.
     """
-    def __call__(self, value=None, exc=None):
-        self.callback(send=value, exc=exc)
+    def __call__(self, *args):
+        """Any arguments passed to the callback are yielded from the event as
+        a tuple
+        """
+        self.callback(args)
 
 class Queue(Event):
     """
