@@ -22,11 +22,10 @@ def resolve(event_driver, name, family=AF_UNSPEC):
         timer.stop()
         
         if trigger is timer:
-            channel.process_fd(*(None for op in self.ops))
+            ops = ()
         else:
             (fd, ops) = args
-            channel.process_fd(*
-                (fd if (op in ops) else None for op in self.ops))
+        channel.process_fd(*(fd if (op in ops) else None for op in self.ops))
     cares.check(self.status)
     raise StopIteration(self.hostent)
 
