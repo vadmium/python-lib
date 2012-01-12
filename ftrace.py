@@ -8,9 +8,13 @@ class traced(Function):
     def __init__(self, func, name=None, abbrev=set()):
         self.func = func
         if name is None:
-            self.name = func.__name__
-            if "from" not in abbrev:
-                self.name = "{0}.{1}".format(func.__module__, self.name)
+            try:
+                self.name = func.__name__
+            except AttributeError:
+                self.name = repr(func)
+            else:
+                if "from" not in abbrev:
+                    self.name = "{0}.{1}".format(func.__module__, self.name)
         else:
             self.name = name
         self.abbrev = abbrev
