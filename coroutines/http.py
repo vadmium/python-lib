@@ -5,6 +5,24 @@ from http.client import (
 from lib import event
 import email.parser
 
+def get(sock, hostname, path):
+    yield sock.send(b"GET ")
+    for c in path.encode("UTF-8"):
+        if c <= ord(b" "):
+            yield sock.send(b"%{:02X}".format(c))
+        else:
+            yield sock.send(bytes((c,)))
+    
+    yield sock.send(b" HTTP/1.1\r\n"
+        
+        # Mandatory for 1.1:
+        b"Host: "
+    )
+    yield sock.send(hostname.encode())
+    yield sock.send(b"\r\n"
+        b"\r\n"
+    )
+
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
