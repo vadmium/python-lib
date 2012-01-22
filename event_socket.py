@@ -1,6 +1,7 @@
 import socket
 import ssl
-import errno
+from errno import (EINPROGRESS, EAGAIN)
+from ssl import (SSLError, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_WRITE)
 
 class Socket:
     """
@@ -19,7 +20,7 @@ class Socket:
                 self.sock.connect(*args, **kw)
                 break
             except socket.error as err:
-                if err.errno != errno.EINPROGRESS:
+                if err.errno != EINPROGRESS:
                     raise
                 # Avoid yielding in exception handler
             yield self.event.writable()
@@ -28,8 +29,9 @@ class Socket:
         while True:
             try:
                 raise StopIteration(self.sock.recv(*args, **kw))
-            except ssl.SSLError as err:
-                if err.args[0] != ssl.SSL_ERROR_WANT_READ:
+            except socket.error as err:
+                if err.errno != EAGAIN and (not isinstance(err, SSLError) or
+                err.args[0] != SSL_ERROR_WANT_READ):
                     raise
                 # Avoid yielding in exception handler
             yield self.event.readable()
@@ -49,8 +51,8 @@ class Ssl(Socket):
         self.sock = ssl.wrap_socket(self.sock, do_handshake_on_connect=False)
         
         self.ssl_events = {
-            ssl.SSL_ERROR_WANT_READ: self.readable,
-            ssl.SSL_ERROR_WANT_WRITE: self.writable,
+            SSL_ERROR_WANT_READ: self.readable,
+            SSL_ERROR_WANT_WRITE: self.writable,
         }
     
     def handshake(self, *args, **kw):
@@ -58,7 +60,7 @@ class Ssl(Socket):
             try:
                 self.sock.do_handshake(*args, **kw)
                 break
-            except ssl.SSLError as err:
+            except SSLError as err:
                 if err.args[0] not in self.ssl_events:
                     raise
                 # Avoid yielding in exception handler
