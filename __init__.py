@@ -1,5 +1,10 @@
 import os
 
+try:
+    from io import SEEK_CUR
+except ImportError:
+    SEEK_CUR = 1
+
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
     for root_dir in path_split(old):
