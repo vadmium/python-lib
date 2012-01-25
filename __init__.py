@@ -5,7 +5,7 @@ from sys import modules
 from sys import argv
 import os
 from types import MethodType
-from urllib.parse import urlsplit
+from urllib.parse import (urlsplit, urlunsplit)
 
 try:
     import builtins
@@ -168,4 +168,6 @@ def url_port(url, scheme, ports):
     port = parsed.port
     if port is None:
         port = def_port
-    return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port)
+    path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
+    return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
+        path=path)
