@@ -149,7 +149,12 @@ def path_split(path):
         if component:
             yield component
 
-def skip(s, c):
-    if not s.startswith(c):
-        raise ValueError("Expected {0!r} in string".format(c))
-    return s[len(c):]
+def strip(s, start="", end=""):
+    if not s.startswith(start):
+        raise ValueError("Expected {0!r} starting string".format(start))
+    if not s.endswith(end):
+        raise ValueError("Expected {0!r} ending string".format(end))
+    if len(s) < len(start) + len(end):
+        raise ValueError(
+            "String not enclosed by {0!r} and {1!r}".format(start, end))
+    return s[len(start):-len(end)]
