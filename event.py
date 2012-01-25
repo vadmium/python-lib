@@ -12,8 +12,9 @@ import weakref
 from lib import weakmethod
 from sys import exc_info
 from lib import Record
+from sys import (displayhook, excepthook)
 
-def Routine(routine, group=None):
+class Routine:
     """
     Runs an event-driven co-routine implemented as a generator. The generator
     can yield:
@@ -22,16 +23,10 @@ def Routine(routine, group=None):
     parent co-routine is continued
     """
     
-    if group is None:
-        group = Group()
-    RoutineCls(routine, group)
-    return group
-
-class RoutineCls:
-    def __init__(self, routine, group):
+    def __init__(self, routine, result=False):
+        self.result = result
+        self.reapers = list()
         self.routines = [routine]
-        self.group = weakref.ref(group)
-        self.group().set.add(self)
         try:
             self.bump()
         except:
@@ -83,14 +78,20 @@ class RoutineCls:
                         exc = None
                         send = None
             
-            self.close()
+            if not self.result:
+                if exc:
+                    excepthook(*exc)
+                else:
+                    displayhook(send)
+            
             if exc:
-                raise exc[1]
-                
-                #~ # Alternative for Python 2, to include traceback
-                #~ raise exc[0], exc[1], exc[2]
+                self.result = exc
             else:
-                return send
+                self.result = (None, StopIteration(send), None)
+            
+            for r in self.reapers:
+                r()
+        
         finally:
             # Break circular reference if traceback includes this function
             del exc
@@ -100,12 +101,19 @@ class RoutineCls:
             self.event.close()
             while self.routines:
                 self.routines.pop().close()
-        try:
-            self.group().set.remove(self)
-        except (ReferenceError, LookupError):
-            pass
     
     __del__ = close
+    
+    def join(self):
+        if self.routines:
+            r = Callback()
+            self.reapers.append(r)
+            yield r
+        
+        raise self.result[1]
+        
+        #~ # Alternative for Python 2, to include traceback
+        #~ raise self.result[0], self.result[1], self.result[2]
     
     def __repr__(self):
         return "<{} {:#x}>".format(type(self).__name__, id(self))
@@ -113,9 +121,13 @@ class RoutineCls:
 class Group:
     def __init__(self):
         self.set = set()
+    
+    def add(self, routine):
+        self.set.add(routine)
+    
     def close(self):
-        for i in list(self.set):
-            i.close()
+        while self.set:
+            self.set.pop().close()
 
 class Event(object):
     """Base class for events that a co-routine can wait on by yielding"""
