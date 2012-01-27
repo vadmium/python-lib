@@ -157,4 +157,4 @@ def strip(s, start="", end=""):
     if len(s) < len(start) + len(end):
         raise ValueError(
             "String not enclosed by {0!r} and {1!r}".format(start, end))
-    return s[len(start):-len(end)]
+    return s[len(start):len(s) - len(end)]
