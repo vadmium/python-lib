@@ -84,6 +84,11 @@ def assimilate(name, fromlist):
 def run_main(module):
     if module != "__main__":
         return
+    main = modules[module].main
+    try:
+        alias_opts = main.alias_opts
+    except AttributeError:
+        alias_opts = dict()
     
     args = list()
     opts = dict()
@@ -97,11 +102,19 @@ def run_main(module):
             args.extend(cmd_args)
             break
         if arg.startswith("-"):
-            opts[arg[len("-"):]] = next(cmd_args)
+            opt = arg[len("-"):]
+            try:
+                opt = alias_opts[opt]
+            except LookupError:
+                pass
+            if opt in main.arg_opts:
+                opts[opt] = next(cmd_args)
+            else:
+                opts[opt] = True
         else:
             args.append(arg)
     
-    modules[module].main(*args, **opts)
+    main(*args, **opts)
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
