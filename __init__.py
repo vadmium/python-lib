@@ -56,7 +56,7 @@ class WeakBinding(Function):
     def __call__(self, *args, **kw):
         obj = self.ref()
         if obj is None:
-            raise ReferenceError("dead weakly-bound method {} called".
+            raise ReferenceError("dead weakly-bound method {0} called".
                 format(self.func))
         return self.func.__get__(obj, type(obj))(*args, **kw)
     def __repr__(self):
@@ -66,18 +66,18 @@ class WeakBinding(Function):
 def gen_repr(gi):
     f = gi.gi_frame
     if f:
-        return "<{} {:#x}, {}:{}>".format(f.f_code.co_name, id(gi),
+        return "<{0} {1:#x}, {2}:{3}>".format(f.f_code.co_name, id(gi),
             basename(f.f_code.co_filename), f.f_lineno)
     else:
-        return "<{} {:#x} (inactive)>".format(gi.gi_code.co_name,
+        return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
 
 class Record(object):
     def __init__(self, *args, **kw):
         self.__dict__.update(*args, **kw)
     def __repr__(self):
-        return "{}({})".format(type(self).__name__,
-            ", ".join("{}={!r}".format(name, value)
+        return "{0}({1})".format(type(self).__name__,
+            ", ".join("{0}={1!r}".format(name, value)
             for (name, value) in self.__dict__.items()))
 
 def assimilate(name, fromlist):
