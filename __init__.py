@@ -93,6 +93,10 @@ def run_main(module):
         alias_opts = main.alias_opts
     except AttributeError:
         alias_opts = dict()
+    try:
+        arg_opts = main.arg_opts
+    except AttributeError:
+        arg_opts = ()
     
     args = list()
     opts = dict()
@@ -110,8 +114,9 @@ def run_main(module):
             try:
                 opt = alias_opts[opt]
             except LookupError:
-                pass
-            if opt in main.arg_opts:
+                opt = opt.replace("-", "_")
+            
+            if opt in arg_opts:
                 opts[opt] = next(cmd_args)
             else:
                 opts[opt] = True
