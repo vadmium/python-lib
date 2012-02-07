@@ -14,7 +14,7 @@ from sys import exc_info
 from lib import Record
 from sys import (displayhook, excepthook)
 
-class Routine:
+class Routine(object):
     """
     Runs an event-driven co-routine implemented as a generator. The generator
     can yield:
@@ -116,9 +116,9 @@ class Routine:
         #~ raise self.result[0], self.result[1], self.result[2]
     
     def __repr__(self):
-        return "<{} {:#x}>".format(type(self).__name__, id(self))
+        return "<{0} {1:#x}>".format(type(self).__name__, id(self))
 
-class Group:
+class Group(object):
     def __init__(self):
         self.set = set()
     
@@ -229,7 +229,7 @@ class Any(Event):
         return "<{0}([{1}])>".format(
             type(self).__name__, ", ".join(str(e.event) for e in self.set))
 
-class Subevent:
+class Subevent(object):
     def __init__(self, set, event):
         self.set = set
         self.event = event
@@ -238,7 +238,7 @@ class Subevent:
     def trigger(self, send=None, exc=None):
         self.set().callback(send=(self.event, send), exc=exc)
 
-class constructor:
+class constructor(object):
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
     def __init__(self, cls):
         self.cls = cls
