@@ -48,15 +48,13 @@ class Routine(object):
         
         try:
             while self.routines:
+                current = self.routines[-1]
                 try:
-                    current = self.routines[-1]
                     if exc:
                         # Traceback from first parameter apparently ignored
                         obj = current.throw(*exc)
-                    elif send is not None:
-                        obj = current.send(send)
                     else:
-                        obj = next(current)
+                        obj = current.send(send)
                 except BaseException as e:
                     self.routines.pop()
                     if isinstance(e, StopIteration):
@@ -66,8 +64,12 @@ class Routine(object):
                         else:
                             send = None
                     else:
-                        # Saving exception creates circular reference
-                        exc = exc_info()
+                        # Saving traceback creates circular reference
+                        # Remove our throw or send call from traceback
+                        tb = exc_info()[2].tb_next
+                        if hasattr(e, "__traceback__"):
+                            e.__traceback__ = tb
+                        exc = (type(e), e, tb)
                 else:
                     if isinstance(obj, Event):
                         self.event = obj
