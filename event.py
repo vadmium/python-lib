@@ -80,16 +80,16 @@ class Routine(object):
                         exc = None
                         send = None
             
-            if not self.result:
+            if self.result:
+                if exc:
+                    self.result = exc
+                else:
+                    self.result = (None, StopIteration(send), None)
+            else:
                 if exc:
                     excepthook(*exc)
                 else:
                     displayhook(send)
-            
-            if exc:
-                self.result = exc
-            else:
-                self.result = (None, StopIteration(send), None)
             
             for r in self.reapers:
                 r()
@@ -112,10 +112,11 @@ class Routine(object):
             self.reapers.append(r)
             yield r
         
-        raise self.result[1]
-        
-        #~ # Alternative for Python 2, to include traceback
-        #~ raise self.result[0], self.result[1], self.result[2]
+        if self.result:
+            raise self.result[1]
+            
+            #~ # Alternative for Python 2, to include traceback
+            #~ raise self.result[0], self.result[1], self.result[2]
     
     def __repr__(self):
         return "<{0} {1:#x}>".format(type(self).__name__, id(self))
