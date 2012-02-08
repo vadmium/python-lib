@@ -1,211 +1,298 @@
 # Reference: https://tools.ietf.org/html/rfc2616
 
-SPACE_LIMIT = 8
-
 def response_handler(sock):
+    parser = Parser(sock)
+    yield parser.next_char()
+    
     class Http0_9(BaseException):
         pass
-    
-    NUMBER_LIMIT = 9
-    TOKEN_LIMIT = 120
-    HEADER_LIMIT = 30000
     
     try:
         # if response does not begin "HTTP/n.n 999 ", assume HTTP/0.9
         # simple-response
         
         try:
-            (c, eol, pre_space) = (yield parse_space(sock))
+            pre_space = (yield parser.space())
         except ExcessError as e:
             raise Http0_9(e.data)
-        if eol:
-            raise Http0_9(pre_space + eol + c)
+        if parser.eol:
+            raise Http0_9(pre_space + parser.eol + parser.c)
         
         pattern = b"HTTP/"
         for (i, p) in enumerate(pattern):
             if i:
-                c = (yield sock.recv(1))
-            if not c or ord(c) != p:
-                raise Http0_9(pre_space + pattern[:i] + c)
+                yield parser.next_char()
+            if not parser.c or ord(parser.c) != p:
+                raise Http0_9(pre_space + pattern[:i] + parser.c)
         
         major = bytearray()
-        for _ in range(NUMBER_LIMIT):
-            c = (yield sock.recv(1))
-            if c == b".":
+        for _ in range(parser.NUMBER_LIMIT):
+            yield parser.next_char()
+            if parser.c == b".":
                 break
-            major.extend(c)
-            if not c.isdigit():
+            major.extend(parser.c)
+            if not parser.c.isdigit():
                 raise Http0_9(pre_space + pattern + major)
         else:
             raise Http0_9(pre_space + pattern + major)
         
         minor = bytearray()
-        for _ in range(NUMBER_LIMIT):
-            c = (yield sock.recv(1))
-            if not c.isdigit():
+        for _ in range(parser.NUMBER_LIMIT):
+            yield parser.next_char()
+            if not parser.c.isdigit():
                 break
-            minor.extend(c)
+            minor.extend(parser.c)
         else:
             raise Http0_9(pre_space + pattern + major + b"." + minor)
         
-        mid_space = bytearray(c)
-        for _ in range(TOKEN_LIMIT):
-            if not c or c.isspace():
+        mid_space = bytearray()
+        for i in range(parser.TOKEN_LIMIT):
+            if i:
+                yield parser.next_char()
+            if not parser.c or parser.c.isspace():
                 break
-            c = (yield sock.recv(1))
-            mid_space.extend(c)
+            mid_space.extend(parser.c)
         try:
-            (c, eol, space) = (yield parse_space(sock, c))
+            space = (yield parser.space())
         except ExcessError as e:
             raise Http0_9(pre_space + pattern + major + b"." + minor +
                 mid_space + e.data)
         mid_space.extend(space)
-        if eol:
+        if parser.eol:
             raise Http0_9(pre_space + pattern + major + b"." + minor +
-                mid_space + eol + c)
+                mid_space + parser.eol + parser.c)
         
         status = bytearray()
         for i in range(3):
             if i:
-                c = (yield sock.recv(1))
-            status.extend(c)
-            if not c.isdigit():
+                yield parser.next_char()
+            status.extend(parser.c)
+            if not parser.c.isdigit():
                 raise Http0_9(pre_space + pattern + major + b"." + minor +
                     mid_space + status)
     
     except Http0_9 as e:
         (pending,) = e.args
-        raise NotImplementedError("HTTP/0.9")
+        chunked = False
     
     else:
         if int(major) != 1:
             raise EnvironmentError("Unsupported: HTTP/{}".format(major))
         
-        (c, eol, _) = (yield parse_space(sock))
+        yield parser.next_char()
+        yield parser.space()
         
         reason = bytearray()
         for i in range(400):
             if i:
-                (c, eol) = (yield parse_eol(sock, (yield sock.recv(1))))
-            if eol is not None:
-                if not c.isspace() or c in CRLF:
+                yield parser.next_char()
+                yield parser.after_eol()
+            if parser.eol is not None:
+                if not parser.at_lws():
                     break
                 else:
-                    reason.extend(eol)
-            reason.extend(c)
+                    reason.extend(parser.eol)
+            reason.extend(parser.c)
         else:
             raise ExcessError("Excessive status reason")
         reason = reason.rstrip()
         
-        print(status.decode("ISO-8859-1"), reason.decode("ISO-8859-1"))
+        chunked = (yield parser.headers())
         
-        # End of headers if direct CRLF
-        while c and c not in CRLF:
+        # pending = parser.c
+    
+    if not chunked:
+        raise NotImplementedError("Not chunked transfer encoding")
+    
+    for _ in range(30000):
+        yield parser.after_eol()
+        yield parser.space()
+        size = 0
+        if parser.eol is None:
+            for _ in range(30):
+                try:
+                    digit = int(parser.c, 16)
+                except ValueError:
+                    break
+                size = size * 16 + digit
+                yield parser.next_char()
+            else:
+                raise ExcessError("Excessive chunk size")
+            yield parser.after_eol()
+        yield parser.line()
+        
+        if not size:
+            break
+        
+        if size > 3000000:
+            raise ExcessError("Excessive chunk")
+        data = parser.c
+        from sys import stdout
+        while True:
+            stdout.buffer.write(data)
+            size -= len(data)
+            if size <= 0:
+                break
+            
+            data = (yield sock.recv(min(size, 0x1000)))
+            if not data:
+                break
+        
+        yield parser.next_char()
+    else:
+        raise ExcessError("Excessive number of chunks")
+    
+    print("done")
+    yield parser.headers()
+    print("parsed trailers")
+
+class Parser(object):
+    def __init__(self, sock):
+        self.sock = sock
+    
+    SPACE_LIMIT = 8
+    TOKEN_LIMIT = 120
+    NUMBER_LIMIT = 9
+    
+    def headers(self):
+        """
+        Entry with c = any char
+        Leaves with c = start of eol
+        """
+        
+        chunked = False
+        
+        #~ message = Message()
+        
+        for _ in range(300):
+            # End of headers if direct CRLF
+            if self.at_eol():
+                raise StopIteration(chunked)
+            
             # read <token> :
             # ws, chars except crlf and :, :, then rstrip token)
             # If crlf before :, ignore the line
-            (c, eol, _) = (yield parse_space(sock, c))
+            yield self.space()
             
             name = bytearray()
             pattern = b"Transfer-Encoding".lower()
             for p in pattern:
-                if eol is not None or not c or ord(c.lower()) != p:
+                if (self.eol is not None or
+                not self.c or ord(self.c.lower()) != p):
                     match = False
                     break
-                (c, eol) = (yield parse_eol(sock, (yield sock.recv(1))))
+                yield self.next_char()
+                yield self.after_eol()
             else:
                 match = True
-            for i in range(TOKEN_LIMIT):
+            for i in range(self.TOKEN_LIMIT):
                 if i:
-                    (c, eol) = (yield parse_eol(sock, (yield sock.recv(1))))
+                    yield self.next_char()
+                    yield self.after_eol()
                 
-                if c.isspace() and c not in CRLF:
+                if self.at_lws():
                     pass
-                elif eol is not None or c == b":":
+                elif self.eol is not None or self.c == b":":
                     break
                 else:
                     match = False
                 
-                if eol:
-                    name.extend(eol)
-                name.extend(c)
+                #~ if eol:
+                    #~ name.extend(eol)
+                #~ name.extend(c)
             else:
                 raise ExcessError("Excessive token")
             
-            if eol is None:
-                (c, eol, _) = (yield parse_space(sock))
+            if self.eol is None:
+                yield self.next_char()
+                yield self.space()
             
             if match:
-                print("Transfer-Encoding")
                 pattern = b"chunked".lower()
                 for p in pattern:
-                    if eol is not None or not c or ord(c.lower()) != p:
+                    if (self.eol is not None or
+                    not self.c or ord(self.c.lower()) != p):
                         match = False
                         break
-                    (c, eol) = (yield parse_eol(sock, (yield sock.recv(1))))
-            for i in range(HEADER_LIMIT):
-                if i:
-                    (c, eol) = (yield parse_eol(sock, (yield sock.recv(1))))
-                
-                if c.isspace() and c not in CRLF:
-                    pass
-                elif eol is not None:
-                    break
-                else:
-                    match = False
-            else:
-                raise ExcessError("Excessive header")
+                    yield self.next_char()
+                    yield self.after_eol()
+            substance = (yield self.line())
             
-            if match:
-                print("chunked")
-        
-        (pending, _) = (yield parse_eol(sock, c))
+            chunked |= match and not substance
+        else:
+            raise ExcessError("Excessive number of headers")
     
-    from sys import stdout
-    while True:
-        #~ stdout.buffer.write(pending)
+    def space(self):
+        """Read and skip over spaces
         
-        pending = (yield sock.recv(0x1000))
-        if not pending:
-            break
+        Entry with c = any char
+        """
+        
+        space = bytearray()
+        for i in range(self.SPACE_LIMIT):
+            if i:
+                yield self.next_char()
+            yield self.after_eol()
+            if not self.at_lws():
+                raise StopIteration(bytes(space))
+            
+            if self.eol:
+                space.extend(self.eol)
+            space.extend(self.c)
+        else:
+            raise ExcessError("Excessive space", bytes(space))
+    
+    def line(self):
+        """Skip until the end of line is reached
+        
+        Entry after calling after_eol
+        """
+        
+        substance = False
+        for i in range(3000):
+            if i:
+                yield self.next_char()
+                yield self.after_eol()
+            
+            if self.at_lws():
+                pass
+            elif self.eol is not None:
+                raise StopIteration(substance)
+            else:
+                substance = True
+        else:
+            raise ExcessError("Excessive line")
 
-def parse_space(sock, c=None):
-    space = bytearray()
-    for _ in range(SPACE_LIMIT):
-        if c is None:
-            c = (yield sock.recv(1))
-        (c, eol) = (yield parse_eol(sock, c))
-        if not c.isspace() or c in CRLF:
-            raise StopIteration((c, eol, bytes(space)))
+    def after_eol(self):
+        """eol, c -> (c, eol)
+        eol, EOF -> ("", eol)
+        EOF -> ("", "")
+        c != eol -> (c, None)
         
-        if eol:
-            space.extend(eol)
-        space.extend(c)
-        c = None
-    else:
-        raise ExcessError("Excessive space", bytes(space))
-
-def parse_eol(sock, c):
-    """eol, c -> (c, eol)
-    eol, EOF -> ("", eol)
-    EOF -> ("", "")
-    c != eol -> (c, None)
+        Check for EOF: c == ""
+        Check for EOL incl EOF: eol is not None
+        True EOL: bool(eol)
+        Check for LWS: c.isspace()
+        """
+        
+        if not self.at_eol():
+            self.eol = None
+            return
+        
+        self.eol = self.c
+        yield self.next_char()
+        if self.eol == b"\r" and self.c == b"\n":
+            self.eol = CRLF
+            yield self.next_char()
     
-    Check for EOF: c == ""
-    Check for EOL incl EOF: eol is not None
-    True EOL: bool(eol)
-    Check for LWS: c.isspace()
-    """
+    def at_eol(self):
+        return not self.c or self.c in CRLF
     
-    if c and c not in CRLF:
-        raise StopIteration((c, None))
+    def at_lws(self):
+        return self.c.isspace() and self.c not in CRLF
     
-    eol = c
-    c = (yield sock.recv(1))
-    if eol == b"\r" and c == b"\n":
-        eol = CRLF
-        c = (yield sock.recv(1))
-    raise StopIteration((c, eol))
+    def next_char(self):
+        self.c = (yield self.sock.recv(1))
 
 class ExcessError(EnvironmentError):
     def __init__(self, msg, data=None):
