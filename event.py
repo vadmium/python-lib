@@ -75,6 +75,10 @@ class Routine(object):
                         self.event = obj
                         self.event.arm(self.wakeup)
                         return
+                    elif isinstance(obj, Yield):
+                        self.routines.pop()
+                        exc = None
+                        send = obj.send
                     else:
                         self.routines.append(obj)
                         exc = None
@@ -144,6 +148,10 @@ class Event(object):
     def close(self):
         """Cancel the effect of the "arm" method call"""
         self.callback = None
+
+class Yield(object):
+    def __init__(self, send):
+        self.send = send
 
 class Callback(Event):
     """
