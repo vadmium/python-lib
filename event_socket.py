@@ -51,8 +51,8 @@ class Ssl(Socket):
         self.sock = ssl.wrap_socket(self.sock, do_handshake_on_connect=False)
         
         self.ssl_events = {
-            SSL_ERROR_WANT_READ: self.readable,
-            SSL_ERROR_WANT_WRITE: self.writable,
+            SSL_ERROR_WANT_READ: self.event.readable,
+            SSL_ERROR_WANT_WRITE: self.event.writable,
         }
     
     def handshake(self, *args, **kw):
@@ -65,4 +65,4 @@ class Ssl(Socket):
                     raise
                 # Avoid yielding in exception handler
                 event = self.ssl_events[err.args[0]]
-            yield event
+            yield event()
