@@ -4,6 +4,7 @@ from os.path import basename
 from sys import modules
 from sys import argv
 import os
+from types import MethodType
 
 try:
     import builtins
@@ -17,17 +18,12 @@ except ImportError:
 
 class Function(object):
     def __init__(self):
+        # By default, name the function after its class
         self.__name__ = type(self).__name__
     def __get__(self, obj, cls):
         if obj is None:
             return self
-        return Binding(self, obj)
-class Binding:
-    def __init__(self, func, obj):
-        self.func = func
-        self.obj = obj
-    def __call__(self, *args, **kw):
-        return self.func(self.obj, *args, **kw)
+        return MethodType(self, obj)
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
