@@ -1,7 +1,6 @@
 from lib import event
 from lib import cares
 from socket import AF_UNSPEC
-from itertools import compress
 
 def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(event_driver)
@@ -43,7 +42,7 @@ class ResolveContext:
             except LookupError:
                 event = self.FileEvent(s)
                 self.files[s] = event
-            event.watch(compress(self.ops, ops))
+            event.watch(op for (op, enable) in zip(self.ops, ops) if enable)
         else:
             try:
                 del self.files[s]
