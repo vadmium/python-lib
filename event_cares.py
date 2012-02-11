@@ -31,17 +31,17 @@ def resolve(event_driver, name, family=AF_UNSPEC):
 
 class ResolveContext:
     def __init__(self, event_driver):
-        self.event_driver = event_driver
+        self.FileEvent = event_driver.FileEvent
         self.status = None
         self.files = dict()  # File events by file descriptor
-        self.ops = (self.event_driver.READ, self.event_driver.WRITE)
+        self.ops = (self.FileEvent.READ, self.FileEvent.WRITE)
     
     def sock_state(self, s, *ops):
         if any(ops):
             try:
                 event = self.files[s]
             except LookupError:
-                event = self.event_driver.FileEvent(s)
+                event = self.FileEvent(s)
                 self.files[s] = event
             event.watch(compress(self.ops, ops))
         else:
