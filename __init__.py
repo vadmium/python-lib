@@ -5,7 +5,11 @@ from sys import modules
 from sys import argv
 import os
 from types import MethodType
-from urllib.parse import (urlsplit, urlunsplit)
+
+try:
+    from urllib.parse import (urlsplit, urlunsplit)
+except ImportError:
+    from urlparse import (urlsplit, urlunsplit)
 
 try:
     import builtins
@@ -157,17 +161,21 @@ def strip(s, start="", end=""):
     return s[len(start):len(s) - len(end)]
 
 def url_port(url, scheme, ports):
+    """Raises "ValueError" if the URL is not valid"""
+    
     parsed = urlsplit(url, scheme=scheme)
     if not parsed.hostname:
         parsed = urlsplit("//" + url, scheme=scheme)
     if not parsed.hostname:
         raise ValueError("No host name specified: {0}".format(url))
     
-    def_port = ports[parsed.scheme]
-        #~ raise ValueError("Unhandled scheme: {}".format(parsed.scheme))
+    try:
+        def_port = ports[parsed.scheme]
+    except LookupError:
+        raise ValueError("Unhandled scheme: {0}".format(parsed.scheme))
     port = parsed.port
     if port is None:
         port = def_port
     path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
     return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
-        path=path)
+        path=path, username=parsed.username, password=parsed.password)
