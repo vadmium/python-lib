@@ -2,13 +2,15 @@ from __future__ import print_function
 
 from lib import event
 from lib import cares
-from socket import (SOCK_STREAM, AF_UNSPEC, AF_INET, AF_INET6)
-from event_socket import Socket
+from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
 
-def name_connect(event_driver, hostname, port, type=SOCK_STREAM,
-callback=None):
-    sock = None
+def name_connect(event_driver, hostname, port, Socket,
+callback=None, message=None):
+    if message is not None:
+        callback = MessageCallback(message)
+    
+    resolved = False
     
     for family in (AF_UNSPEC, AF_INET6, AF_INET):
         if callback is not None:
@@ -18,25 +20,41 @@ callback=None):
         except EnvironmentError as e:
             print(e, file=stderr)
             continue
+        resolved = True
         
-        sock = Socket(event_driver, hostent.addrtype, type)
-        
-        for addr in hostent.addr_list:
-            if callback is not None:
-                callback.connecting(addr, port)
-            try:
-                yield sock.connect((addr, port))
-            except EnvironmentError as e:
-                print(e, file=stderr)
+        sock = Socket(hostent.addrtype)
+        try:
+            for addr in hostent.addr_list:
+                if callback is not None:
+                    callback.connecting(addr, port)
+                try:
+                    yield sock.connect((addr, port))
+                except EnvironmentError as e:
+                    print(e, file=stderr)
+                    continue
+                break
+            else:
+                sock.close()
                 continue
-            raise StopIteration(sock)
+        except:
+            sock.close()
+            raise
+        raise StopIteration(sock)
     
     else:
-        if sock is None:
-            raise EnvironmentError("Failure resolving {0}".format(hostname))
-        else:
+        if resolved:
             raise EnvironmentError("All addresses unconnectable: {0}".format(
                 hostname))
+        else:
+            raise EnvironmentError("Failure resolving {0}".format(hostname))
+
+class MessageCallback(object):
+    def __init__(self, callback):
+        self.callback = callback
+    def lookingup(self, name, family):
+        self.callback("Looking up {0} (family {1})".format(name, family))
+    def connecting(self, addr, port):
+        self.callback("Connecting to {0}:{1}".format(addr, port))
 
 def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(event_driver)
