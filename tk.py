@@ -7,10 +7,11 @@ from lib import Record
 import tkinter
 from tkinter.ttk import Label
 
-def add_field(window, row, label, widget):
-    Label(window, text=label).grid(
-        row=row, column=0, sticky=tkinter.E + tkinter.W)
-    widget.grid(row=row, column=1, sticky=tkinter.E + tkinter.W)
+def add_field(window, label, widget, **kw):
+    label = Label(window, text=label)
+    label.grid(column=0, sticky=tkinter.E + tkinter.W, **kw)
+    row = label.grid_info()["row"]
+    widget.grid(row=row, column=1, sticky=tkinter.E + tkinter.W, **kw)
 
 def treeview_add(tree, parent, *args, **kw):
     child = tree.insert(parent, "end", *args, **kw)
