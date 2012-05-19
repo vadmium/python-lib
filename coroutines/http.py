@@ -2,7 +2,7 @@
 
 from http.client import (
     HTTP_PORT, UnknownTransferEncoding, BadStatusLine, UnknownProtocol)
-import event
+from lib import event
 import email.parser
 
 class HTTPConnection(object):
