@@ -1,5 +1,5 @@
-import event
-import cares
+from lib import event
+from lib import cares
 from socket import AF_UNSPEC
 from itertools import compress
 
