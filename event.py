@@ -24,6 +24,13 @@ class Routine(object):
     """
     
     def __init__(self, routine, result=False):
+        """
+        result=True argument indicates that any exception raised or value
+        returned from the co-routine should be saved and returned whenever the
+        join() method is called. By default the result is passed to sys.
+        excepthook() or sys.displayhook() instead.
+        """
+        
         self.result = result
         self.reapers = list()
         self.routines = [routine]
