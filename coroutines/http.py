@@ -134,6 +134,7 @@ class HTTPResponse(object):
         except (LookupError, ValueError):
             raise UnknownTransferEncoding("Not chunked transfer encoding")
         
+        # Remove "chunked" from end of header value
         try:
             (split,) = split
         except ValueError:
@@ -141,6 +142,7 @@ class HTTPResponse(object):
         else:
             te[-1] = split.rstrip()
         
+        # Replace header fields back into message object
         del self.msg["Transfer-Encoding"]
         for i in te:
             self.msg["Transfer-Encoding"] = i
@@ -148,6 +150,12 @@ class HTTPResponse(object):
         self.chunks = self.Chunks(parser)
     
     def Chunks(self, parser):
+        """
+        Generator that returns chunk length and the first byte of each chunk
+        
+        Entry with parser.c = Start of EOL following headers
+        """
+        
         for _ in range(30000):
             yield parser.after_eol()
             yield parser.space()
@@ -186,6 +194,11 @@ class HTTPResponse(object):
         yield parser.headers()
 
 class Parser(object):
+    """
+    "c" may hold last read character; empty string at EOF
+    "eol" may ...
+    """
+    
     def __init__(self, sock):
         self.sock = sock
     
@@ -195,8 +208,8 @@ class Parser(object):
     
     def headers(self):
         """
-        Entry with c = any char
-        Leaves with c = start of eol
+        Entry with self.c = first character of headers
+        Leaves with self.c = start of EOL which terminated the headers
         """
         
         parser = email.parser.FeedParser()
@@ -235,7 +248,13 @@ class Parser(object):
             raise ExcessError("Excessive space", bytes(space))
 
     def after_eol(self):
-        """eol, c -> (c, eol)
+        """Parses potential end of line and reads the next character
+        
+        Sets self.eol = EOL character sequence, if "self.c" was at EOL, or
+            "None"
+        Returns with self.c = next character, following EOL if found
+        
+        eol, c -> (c, eol)
         eol, EOF -> ("", eol)
         EOF -> ("", "")
         c != eol -> (c, None)
