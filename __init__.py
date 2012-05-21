@@ -5,6 +5,7 @@ from sys import modules
 from sys import argv
 import os
 from types import MethodType
+from functools import partial
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -29,6 +30,16 @@ class Function(object):
         if obj is None:
             return self
         return MethodType(self, obj)
+
+class deco_factory(Function):
+    """Decorator to create a decorator factory given a function taking the
+    factory input and the object to be decorated"""
+    def __init__(self, d):
+        self.d = d
+        self.__name__ = d.__name__
+        self.__doc__ = d.__doc__
+    def __call__(self, *args, **kw):
+        return partial(self.d, *args, **kw)
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
@@ -179,3 +190,9 @@ def url_port(url, scheme, ports):
     path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
     return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
+
+@deco_factory
+def fields(f, *args, **kw):
+    "Decorator factory to add arbitrary fields to function object"
+    f.__dict__.update(*args, **kw)
+    return f
