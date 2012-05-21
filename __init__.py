@@ -215,3 +215,6 @@ def fields(f, *args, **kw):
     "Decorator factory to add arbitrary fields to function object"
     f.__dict__.update(*args, **kw)
     return f
+
+def nop(*args, **kw):
+    pass
