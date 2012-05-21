@@ -63,7 +63,7 @@ class traced(Function):
 
 def trace(func, *args, **kw):
     return traced(func)(*args, **kw)
-def tracer(name):
+def Tracer(name):
     return traced(nop, name=name, abbrev=set(("return",)))
 
 def print_call(name, args, kw, abbrev=set()):
