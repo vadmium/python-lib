@@ -106,9 +106,16 @@ def run_main(module):
     except AttributeError:
         alias_opts = dict()
     try:
-        arg_opts = main.arg_opts
+        arg_types = main.arg_types
     except AttributeError:
-        arg_opts = ()
+        arg_types = dict()
+    
+    try:
+        ann = main.__annotations__
+    except AttributeError:
+        pass
+    else:
+        arg_types.update(ann)
     
     args = list()
     opts = dict()
@@ -128,12 +135,24 @@ def run_main(module):
             except LookupError:
                 opt = opt.replace("-", "_")
             
-            if opt in arg_opts:
-                opts[opt] = next(cmd_args)
+            convert = arg_types.get(opt)
+            if convert is True:
+                arg = convert
             else:
-                opts[opt] = True
+                arg = next(cmd_args)
+                if opt in arg_types:
+                    arg = convert(arg)
+            opts[opt] = arg
         else:
             args.append(arg)
+    
+    for i in range(len(args)):
+        try:
+            convert = arg_types[i]
+        except LookupError:
+            pass
+        else:
+            args[i] = convert(args[i])
     
     main(*args, **opts)
 
