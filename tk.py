@@ -12,6 +12,9 @@ def add_field(window, row, label, widget):
         row=row, column=0, sticky=tkinter.E + tkinter.W)
     widget.grid(row=row, column=1, sticky=tkinter.E + tkinter.W)
 
+def treeview_add(tree, item, *args, **kw):
+    return tree.insert(item, "end", *args, **kw)
+
 # Another potential API implementation
 if False:
     from types import MethodType
