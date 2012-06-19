@@ -12,8 +12,11 @@ def add_field(window, row, label, widget):
         row=row, column=0, sticky=tkinter.E + tkinter.W)
     widget.grid(row=row, column=1, sticky=tkinter.E + tkinter.W)
 
-def treeview_add(tree, item, *args, **kw):
-    return tree.insert(item, "end", *args, **kw)
+def treeview_add(tree, parent, *args, **kw):
+    child = tree.insert(parent, "end", *args, **kw)
+    if not tree.focus():
+        tree.focus(child)
+    return child
 
 # Another potential API implementation
 if False:
