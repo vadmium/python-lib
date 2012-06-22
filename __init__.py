@@ -6,6 +6,7 @@ from sys import argv
 import os
 from types import MethodType
 from functools import partial
+from functools import update_wrapper
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -35,9 +36,8 @@ class deco_factory(Function):
     """Decorator to create a decorator factory given a function taking the
     factory input and the object to be decorated"""
     def __init__(self, d):
+        update_wrapper(self, d)
         self.d = d
-        self.__name__ = d.__name__
-        self.__doc__ = d.__doc__
     def __call__(self, *args, **kw):
         return partial(self.d, *args, **kw)
 
