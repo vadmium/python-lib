@@ -117,6 +117,8 @@ def run_main(module):
     else:
         arg_types.update(ann)
     
+    help_opts = {"help", "_help"}.difference(arg_types.keys())
+    
     args = list()
     opts = dict()
     cmd_args = iter(argv[1:])
@@ -139,7 +141,14 @@ def run_main(module):
             if convert is True:
                 arg = convert
             else:
-                arg = next(cmd_args)
+                try:
+                    arg = next(cmd_args)
+                except StopIteration:
+                    if opt in help_opts:
+                        help(main)
+                        return
+                    else:
+                        raise
                 if opt in arg_types:
                     arg = convert(arg)
             opts[opt] = arg
@@ -154,7 +163,13 @@ def run_main(module):
         else:
             args[i] = convert(args[i])
     
-    main(*args, **opts)
+    try:
+        main(*args, **opts)
+    except TypeError:
+        if help_opts.isdisjoint(opts.keys()):
+            raise
+        else:
+            help(main)
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
