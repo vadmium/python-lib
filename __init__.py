@@ -244,7 +244,7 @@ class Cleanup:
                 exc = (None, None, None)
         return exc == (None, None, None)
     
-    def add(self, context):
+    def __call__(self, context):
         exit = context.__exit__
         enter = context.__enter__
         add_exit = self.exits.append
