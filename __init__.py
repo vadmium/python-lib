@@ -247,18 +247,12 @@ class Cleanup:
     def add(self, context):
         exit = context.__exit__
         enter = context.__enter__
+        add_exit = self.exits.append
         
-        pos = len(self.exits)
-        self.exits.append(null)
-        try:
-            res = enter()
-        finally:
-            if "res" in locals():
-                self.exits[pos] = exit
+        res = enter()
+        add_exit(exit)
+        
         return res
-
-def null(*args, **kw):
-    pass
 
 def nop(*args, **kw):
     pass
