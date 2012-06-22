@@ -61,8 +61,6 @@ class traced(Function):
         print(disp, v, file=stderr)
         startline = True
 
-def trace(func, *args, **kw):
-    return traced(func)(*args, **kw)
 def Tracer(name):
     return traced(nop, name=name, abbrev=set(("return",)))
 
