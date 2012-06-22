@@ -196,9 +196,9 @@ def path_split(path):
             yield component
 
 def strip(s, start="", end=""):
-    if not s.startswith(start):
+    if start and not s.startswith(start):
         raise ValueError("Expected {0!r} starting string".format(start))
-    if not s.endswith(end):
+    if end and not s.endswith(end):
         raise ValueError("Expected {0!r} ending string".format(end))
     if len(s) < len(start) + len(end):
         raise ValueError(
