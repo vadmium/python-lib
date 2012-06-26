@@ -111,10 +111,14 @@ class HTTPConnection(object):
         
         te = msg.get_all("Transfer-Encoding", [])
         try:
-            (*split, last) = te[-1].rsplit(",", 1)
-            if last.lstrip() != "chunked":
-                raise ValueError()
-        except (LookupError, ValueError):
+            last = te[-1]
+        except LookupError:
+            yield parser.after_eol()
+            raise StopIteration(IdentityResponse(self.sock, parser, msg))
+        
+        # TODO: better parsing: eliminate null elements; check for "identity"
+        (*split, last) = last.rsplit(",", 1)
+        if last.strip().lower() != "chunked":
             raise UnknownTransferEncoding("Not chunked transfer encoding")
         
         # Remove "chunked" from end of header value
@@ -131,6 +135,26 @@ class HTTPConnection(object):
             msg["Transfer-Encoding"] = i
         
         raise StopIteration(ChunkedResponse(self.sock, parser, msg))
+
+class IdentityResponse(object):
+    def __init__(self, sock, parser, msg):
+        self.sock = sock
+        self.msg = msg
+        (self.size,) = self.msg.get_all("Content-Length", [])
+        self.size = int(self.size)
+        if self.size:
+            self.data = parser.c
+        else:
+            self.data = None
+    
+    def read(self, amt):
+        if self.data is None:
+            data = (yield self.sock.recv(min(self.size, amt)))
+        else:
+            data = self.data
+            self.data = None
+        self.size -= len(data)
+        raise StopIteration(data)
 
 class ChunkedResponse(object):
     def __init__(self, sock, parser, msg):
