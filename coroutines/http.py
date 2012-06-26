@@ -8,25 +8,8 @@ import email.parser
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
+    
     def getresponse(self):
-        r = HTTPResponse(self.sock)
-        yield r.begin()
-        raise StopIteration(r)
-
-class HTTPResponse(object):
-    def __init__(self, sock):
-        self.sock = sock
-        self.size = None
-    
-    def read(self, amt):
-        if self.size:
-            data = (yield self.sock.recv(min(self.size, amt)))
-        else:
-            (self.size, data) = (yield self.chunks)
-        self.size -= len(data)
-        raise StopIteration(data)
-    
-    def begin(self):
         parser = Parser(self.sock)
         # else: parser.new_line()
         yield parser.next_char()
@@ -98,7 +81,7 @@ class HTTPResponse(object):
         
         except BadStatusLine as e:
             (pending,) = e.args
-            self.msg = message_from_string(b"")
+            msg = message_from_string(b"")
         
         else:
             if int(major) != 1:
@@ -122,11 +105,11 @@ class HTTPResponse(object):
                 raise ExcessError("Excessive status reason")
             reason = reason.rstrip()
             
-            self.msg = (yield parser.headers())
+            msg = (yield parser.headers())
             
             # pending = parser.c
         
-        te = self.msg.get_all("Transfer-Encoding", [])
+        te = msg.get_all("Transfer-Encoding", [])
         try:
             (*split, last) = te[-1].rsplit(",", 1)
             if last.lstrip() != "chunked":
@@ -143,11 +126,26 @@ class HTTPResponse(object):
             te[-1] = split.rstrip()
         
         # Replace header fields back into message object
-        del self.msg["Transfer-Encoding"]
+        del msg["Transfer-Encoding"]
         for i in te:
-            self.msg["Transfer-Encoding"] = i
+            msg["Transfer-Encoding"] = i
         
+        raise StopIteration(ChunkedResponse(self.sock, parser, msg))
+
+class ChunkedResponse(object):
+    def __init__(self, sock, parser, msg):
+        self.sock = sock
+        self.msg = msg
         self.chunks = self.Chunks(parser)
+        self.size = None
+    
+    def read(self, amt):
+        if self.size:
+            data = (yield self.sock.recv(min(self.size, amt)))
+        else:
+            (self.size, data) = (yield self.chunks)
+        self.size -= len(data)
+        raise StopIteration(data)
     
     def Chunks(self, parser):
         """
