@@ -13,7 +13,7 @@ def add_field(window, label, widget, **kw):
     row = label.grid_info()["row"]
     widget.grid(row=row, column=1, sticky=tkinter.E + tkinter.W, **kw)
 
-def treeview_add(tree, parent, *args, **kw):
+def treeview_add(tree, parent="", *args, **kw):
     child = tree.insert(parent, "end", *args, **kw)
     if not tree.focus():
         tree.focus(child)
