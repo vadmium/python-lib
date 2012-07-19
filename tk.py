@@ -9,11 +9,11 @@ from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
 
 def add_field(window, label, widget, multiline=False, **kw):
-    label_sticky = [tkinter.E, tkinter.W]
-    widget_sticky = [tkinter.E, tkinter.W]
+    label_sticky = [tkinter.EW]
+    widget_sticky = [tkinter.EW]
     if multiline:
         label_sticky.append(tkinter.N)
-        widget_sticky.extend((tkinter.N, tkinter.S))
+        widget_sticky.append(tkinter.NS)
     
     label = Label(window, text=label)
     label.grid(column=0, sticky=label_sticky, **kw)
@@ -32,17 +32,16 @@ class ScrolledTree(Frame):
         if columns:
             kw.update(columns=tuple(range(columns)))
         self.tree = Treeview(self, show=("tree",), **kw)
-        self.tree.grid(sticky=(tkinter.E, tkinter.W, tkinter.N, tkinter.S))
+        self.tree.grid(sticky=(tkinter.EW, tkinter.NS))
         
-        scroll = Scrollbar(self, command=self.tree.yview)
-        scroll.grid(row=0, column=1,
-            sticky=(tkinter.W, tkinter.N, tkinter.S))
-        self.tree.config(yscrollcommand=scroll.set)
-        scroll = Scrollbar(self, orient="horizontal",
+        scroll = Scrollbar(self, orient=tkinter.VERTICAL,
+            command=self.tree.yview)
+        scroll.grid(row=0, column=1, sticky=(tkinter.W, tkinter.NS))
+        self.tree.configure(yscrollcommand=scroll.set)
+        scroll = Scrollbar(self, orient=tkinter.HORIZONTAL,
             command=self.tree.xview)
-        scroll.grid(row=1, column=0,
-            sticky=(tkinter.N, tkinter.E, tkinter.W))
-        self.tree.config(xscrollcommand=scroll.set)
+        scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
+        self.tree.configure(xscrollcommand=scroll.set)
     
     def add(self, parent="", *args, **kw):
         child = self.tree.insert(parent, "end", *args, **kw)
