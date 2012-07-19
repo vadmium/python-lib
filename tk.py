@@ -5,7 +5,8 @@ from math import ceil
 from . import event
 from lib import Record
 import tkinter
-from tkinter.ttk import Label
+from tkinter.ttk import (Frame, Label, Scrollbar)
+from tkinter.ttk import Treeview
 
 def add_field(window, label, widget, multiline=False, **kw):
     label_sticky = [tkinter.E, tkinter.W]
@@ -21,11 +22,36 @@ def add_field(window, label, widget, multiline=False, **kw):
         window.rowconfigure(row, weight=1)
     widget.grid(row=row, column=1, sticky=widget_sticky, **kw)
 
-def treeview_add(tree, parent="", *args, **kw):
-    child = tree.insert(parent, "end", *args, **kw)
-    if not tree.focus():
-        tree.focus(child)
-    return child
+class ScrolledTree(Frame):
+    def __init__(self, master, columns=None):
+        Frame.__init__(self, master)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        
+        kw = dict()
+        if columns:
+            kw.update(columns=tuple(range(columns)))
+        self.tree = Treeview(self, show=("tree",), **kw)
+        self.tree.grid(sticky=(tkinter.E, tkinter.W, tkinter.N, tkinter.S))
+        
+        scroll = Scrollbar(self, command=self.tree.yview)
+        scroll.grid(row=0, column=1,
+            sticky=(tkinter.W, tkinter.N, tkinter.S))
+        self.tree.config(yscrollcommand=scroll.set)
+        scroll = Scrollbar(self, orient="horizontal",
+            command=self.tree.xview)
+        scroll.grid(row=1, column=0,
+            sticky=(tkinter.N, tkinter.E, tkinter.W))
+        self.tree.config(xscrollcommand=scroll.set)
+    
+    def add(self, parent="", *args, **kw):
+        child = self.tree.insert(parent, "end", *args, **kw)
+        if not self.tree.focus():
+            self.tree.focus(child)
+        return child
+    
+    def bind_select(self, *args, **kw):
+        self.tree.bind("<<TreeviewSelect>>", *args, **kw)
 
 # Another potential API implementation
 if False:
