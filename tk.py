@@ -7,6 +7,7 @@ from lib import Record
 import tkinter
 from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
+from tkinter.font import Font
 
 def add_field(window, label, widget, multiline=False, **kw):
     label_sticky = [tkinter.EW]
@@ -46,23 +47,37 @@ class ScrolledTree(Frame):
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
         
-        try:
-            items = enumerate(columns)
-        except TypeError:
-            pass
-        else:
-            for (column, text) in items:
-                if column:
-                    column = column - 1
-                else:
-                    column = "#0"
+        for i in range(count):
+            if i:
+                column = i - 1
+            else:
+                column = "#0"
+            
+            try:
+                text = columns[i]
+            except TypeError:
+                width = 0
+            else:
                 self.tree.heading(column, text=text)
+                width = Font().measure(text)
+            
+            self.tree.column(column, stretch=False, width=width)
     
     def add(self, values, parent="", *args, **kw):
         child = self.tree.insert(parent, "end", *args,
             text=values[0], values=values[1:], **kw)
         if not self.tree.focus():
             self.tree.focus(child)
+        
+        for (i, value) in enumerate(values):
+            if i:
+                i = i - 1
+            else:
+                i = "#0"
+            width = Font().measure(value)
+            if width > self.tree.column(i, option="width"):
+                self.tree.column(i, width=width)
+        
         return child
     
     def bind_select(self, *args, **kw):
