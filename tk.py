@@ -23,15 +23,18 @@ def add_field(window, label, widget, multiline=False, **kw):
     widget.grid(row=row, column=1, sticky=widget_sticky, **kw)
 
 class ScrolledTree(Frame):
-    def __init__(self, master, columns=None):
+    def __init__(self, master, columns=1):
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         
         kw = dict()
-        if columns:
-            kw.update(columns=tuple(range(columns)))
-        self.tree = Treeview(self, show=("tree",), **kw)
+        try:
+            count = len(columns)
+        except TypeError:
+            count = columns
+            kw.update(show=("tree",))
+        self.tree = Treeview(self, columns=tuple(range(count - 1)), **kw)
         self.tree.grid(sticky=(tkinter.EW, tkinter.NS))
         
         scroll = Scrollbar(self, orient=tkinter.VERTICAL,
@@ -42,9 +45,22 @@ class ScrolledTree(Frame):
             command=self.tree.xview)
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
+        
+        try:
+            items = enumerate(columns)
+        except TypeError:
+            pass
+        else:
+            for (column, text) in items:
+                if column:
+                    column = column - 1
+                else:
+                    column = "#0"
+                self.tree.heading(column, text=text)
     
-    def add(self, parent="", *args, **kw):
-        child = self.tree.insert(parent, "end", *args, **kw)
+    def add(self, values, parent="", *args, **kw):
+        child = self.tree.insert(parent, "end", *args,
+            text=values[0], values=values[1:], **kw)
         if not self.tree.focus():
             self.tree.focus(child)
         return child
