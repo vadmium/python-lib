@@ -61,6 +61,7 @@ class ScrolledTree(Frame):
                 self.tree.heading(column, text=text)
                 width = Font().measure(text)
             
+            width = max(width, self.tree.column(column, option="minwidth"))
             self.tree.column(column, stretch=False, width=width)
     
     def add(self, values, parent="", *args, **kw):
