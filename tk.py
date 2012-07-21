@@ -82,7 +82,9 @@ class ScrolledTree(Frame):
         return child
     
     def bind_select(self, *args, **kw):
-        self.tree.bind("<<TreeviewSelect>>", *args, **kw)
+        return self.tree.bind("<<TreeviewSelect>>", *args, **kw)
+    def unbind_select(self, *args, **kw):
+        return self.tree.unbind("<<TreeviewSelect>>", *args, **kw)
 
 # Another potential API implementation
 if False:
