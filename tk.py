@@ -24,18 +24,28 @@ def add_field(window, label, widget, multiline=False, **kw):
     widget.grid(row=row, column=1, sticky=widget_sticky, **kw)
 
 class ScrolledTree(Frame):
-    def __init__(self, master, columns=1):
+    def __init__(self, master, columns=1, tree=True):
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         
-        kw = dict()
+        show = list()
+        
         try:
-            count = len(columns)
+            self.nontree_columns = len(columns)
         except TypeError:
-            count = columns
-            kw.update(show=("tree",))
-        self.tree = Treeview(self, columns=tuple(range(count - 1)), **kw)
+            self.nontree_columns = columns
+        else:
+            show.append("headings")
+        
+        self.tree_shown = tree
+        if self.tree_shown:
+            show.append("tree")
+            self.nontree_columns -= 1
+        
+        self.nontree_columns = range(self.nontree_columns)
+        self.tree = Treeview(self, show=show,
+            columns=tuple(self.nontree_columns))
         self.tree.grid(sticky=(tkinter.EW, tkinter.NS))
         
         scroll = Scrollbar(self, orient=tkinter.VERTICAL,
@@ -46,29 +56,30 @@ class ScrolledTree(Frame):
             command=self.tree.xview)
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
+
+        try:
+            columns = zip(self.columns(), columns)
+        except TypeError:
+            pass
+        else:
+            for (column, text) in columns:
+                self.tree.heading(column, text=text)
         
         self.heading_font = nametofont("TkHeadingFont")
         self.space = "\N{EN QUAD}"
-        for i in range(count):
-            if i:
-                column = i - 1
-            else:
-                column = "#0"
-            
-            try:
-                text = columns[i]
-            except TypeError:
-                pass
-            else:
-                self.tree.heading(column, text=text)
-            
+        for column in self.columns():
             text = self.tree.heading(column, option="text")
             width = self.heading_font.measure(text + self.space)
             width = max(width, self.tree.column(column, option="minwidth"))
             self.tree.column(column, stretch=False, width=width)
-        
         self.space_size = self.heading_font.measure(self.space)
         self.text_font = nametofont("TkTextFont")
+    
+    def columns(self):
+        if self.tree_shown:
+            yield "#0"
+        for column in self.nontree_columns:
+            yield column
     
     def add(self, parent="", *args, **kw):
         child = self.tree.insert(parent, "end", *args, **kw)
