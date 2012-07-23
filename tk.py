@@ -7,7 +7,7 @@ from lib import Record
 import tkinter
 from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
-from tkinter.font import Font
+from tkinter.font import nametofont
 
 def add_field(window, label, widget, multiline=False, **kw):
     label_sticky = [tkinter.EW]
@@ -47,6 +47,7 @@ class ScrolledTree(Frame):
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
         
+        self.heading_font = nametofont("TkHeadingFont")
         for i in range(count):
             if i:
                 column = i - 1
@@ -59,10 +60,12 @@ class ScrolledTree(Frame):
                 width = 0
             else:
                 self.tree.heading(column, text=text)
-                width = Font().measure(text)
+                width = self.heading_font.measure(text)
             
             width = max(width, self.tree.column(column, option="minwidth"))
             self.tree.column(column, stretch=False, width=width)
+        
+        self.text_font = nametofont("TkTextFont")
     
     def add(self, values, parent="", *args, **kw):
         child = self.tree.insert(parent, "end", *args,
@@ -75,7 +78,7 @@ class ScrolledTree(Frame):
                 i = i - 1
             else:
                 i = "#0"
-            width = Font().measure(value)
+            width = self.text_font.measure(value)
             if width > self.tree.column(i, option="width"):
                 self.tree.column(i, width=width)
         
