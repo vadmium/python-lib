@@ -48,6 +48,7 @@ class ScrolledTree(Frame):
         self.tree.configure(xscrollcommand=scroll.set)
         
         self.heading_font = nametofont("TkHeadingFont")
+        self.space = "\N{EN QUAD}"
         for i in range(count):
             if i:
                 column = i - 1
@@ -57,14 +58,16 @@ class ScrolledTree(Frame):
             try:
                 text = columns[i]
             except TypeError:
-                width = 0
+                pass
             else:
                 self.tree.heading(column, text=text)
-                width = self.heading_font.measure(text)
             
+            text = self.tree.heading(column, option="text")
+            width = self.heading_font.measure(text + self.space)
             width = max(width, self.tree.column(column, option="minwidth"))
             self.tree.column(column, stretch=False, width=width)
         
+        self.space_size = self.heading_font.measure(self.space)
         self.text_font = nametofont("TkTextFont")
     
     def add(self, values, parent="", *args, **kw):
@@ -78,7 +81,7 @@ class ScrolledTree(Frame):
                 i = i - 1
             else:
                 i = "#0"
-            width = self.text_font.measure(value)
+            width = self.text_font.measure(value) + self.space_size
             if width > self.tree.column(i, option="width"):
                 self.tree.column(i, width=width)
         
