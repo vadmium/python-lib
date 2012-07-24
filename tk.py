@@ -14,19 +14,19 @@ class Form(object):
         self.master = master
         self.master.columnconfigure(1, weight=1)
     
-    def add_field(self, label, widget, multiline=False, **kw):
+    def add_field(self, widget, multiline=False, **kw):
         label_sticky = [tkinter.EW]
         widget_sticky = [tkinter.EW]
         if multiline:
             label_sticky.append(tkinter.N)
             widget_sticky.append(tkinter.NS)
         
-        label = Label(self.master, text=label)
-        label.grid(column=0, sticky=label_sticky, **kw)
+        label = Label(self.master, **kw)
+        label.grid(column=0, sticky=label_sticky)
         row = label.grid_info()["row"]
         if multiline:
             self.master.rowconfigure(row, weight=1)
-        widget.grid(row=row, column=1, sticky=widget_sticky, **kw)
+        widget.grid(row=row, column=1, sticky=widget_sticky)
 
 class ScrolledTree(Frame):
     def __init__(self, master, columns=1, tree=True):
