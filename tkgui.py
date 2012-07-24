@@ -21,4 +21,10 @@ class Tix(object):
             pass
         
         def add_field(self, label, field):
-            self.form.add_field(Frame(), text=label)
+            (head, sep, tail) = label.partition("&")
+            if sep:
+                kw = dict(underline=len(head))
+                label = head + tail
+            else:
+                kw = dict()
+            self.form.add_field(Frame(), text=label, **kw)
