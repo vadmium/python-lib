@@ -9,18 +9,23 @@ from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 
-def add_field(window, label, widget, multiline=False, **kw):
+class Form(object):
+    def __init__(self, master):
+        self.master = master
+        self.master.columnconfigure(1, weight=1)
+    
+    def add_field(self, label, widget, multiline=False, **kw):
         label_sticky = [tkinter.EW]
         widget_sticky = [tkinter.EW]
         if multiline:
             label_sticky.append(tkinter.N)
             widget_sticky.append(tkinter.NS)
         
-        label = Label(window, text=label)
+        label = Label(self.master, text=label)
         label.grid(column=0, sticky=label_sticky, **kw)
         row = label.grid_info()["row"]
         if multiline:
-            window.rowconfigure(row, weight=1)
+            self.master.rowconfigure(row, weight=1)
         widget.grid(row=row, column=1, sticky=widget_sticky, **kw)
 
 class ScrolledTree(Frame):
