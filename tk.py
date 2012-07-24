@@ -13,6 +13,8 @@ class Form(object):
     def __init__(self, master):
         self.master = master
         self.master.columnconfigure(1, weight=1)
+        en = font_size(nametofont("TkDefaultFont")["size"] / 2)
+        self.master.columnconfigure(0, pad=en)
     
     def add_field(self, widget, multiline=False, **kw):
         label_sticky = [tkinter.EW]
@@ -111,6 +113,12 @@ class ScrolledTree(Frame):
         return self.tree.bind("<<TreeviewSelect>>", *args, **kw)
     def unbind_select(self, *args, **kw):
         return self.tree.unbind("<<TreeviewSelect>>", *args, **kw)
+
+def font_size(size):
+    if size < 0:
+        return -size
+    else:
+        return "{size}p".format_map(locals())
 
 # Another potential API implementation
 if False:
