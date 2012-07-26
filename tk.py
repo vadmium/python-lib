@@ -32,24 +32,26 @@ class Form(object):
         widget.grid(row=row, column=1, sticky=widget_sticky)
 
 class ScrolledTree(Frame):
-    def __init__(self, master, columns=1, tree=True):
+    def __init__(self, master, columns=None, tree=True, headings=True):
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         
-        show = list()
-        
-        try:
-            self.nontree_columns = len(columns)
-        except TypeError:
+        if columns is not None:
             self.nontree_columns = columns
         else:
-            show.append("headings")
+            try:
+                self.nontree_columns = len(headings)
+            except TypeError:
+                self.nontree_columns = 1
         
+        show = list()
         self.tree_shown = tree
         if self.tree_shown:
             show.append("tree")
             self.nontree_columns -= 1
+        if headings:
+            show.append("headings")
         
         self.nontree_columns = range(self.nontree_columns)
         self.tree = Treeview(self, show=show,
@@ -64,14 +66,15 @@ class ScrolledTree(Frame):
             command=self.tree.xview)
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
-
-        try:
-            columns = zip(self.columns(), columns)
-        except TypeError:
-            pass
-        else:
-            for (column, text) in columns:
-                self.tree.heading(column, text=text)
+        
+        if headings:
+            try:
+                headings = zip(self.columns(), headings)
+            except TypeError:
+                pass
+            else:
+                for (column, text) in headings:
+                    self.tree.heading(column, text=text)
         
         self.heading_font = nametofont("TkHeadingFont")
         self.space = "\N{EN QUAD}"
