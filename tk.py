@@ -8,6 +8,7 @@ import tkinter
 from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
+from math import ceil
 
 class Form(object):
     def __init__(self, master):
@@ -93,14 +94,22 @@ class ScrolledTree(Frame):
         if not self.tree.focus():
             self.tree.focus(child)
         
+        width = 1
+        while parent:
+            width += 1
+            parent = self.tree.parent(parent)
+        em = font_size(self.text_font["size"])
+        width *= self.tree.winfo_fpixels(em)
+        
         try:
             text = kw["text"]
         except LookupError:
             pass
         else:
-            width = self.text_font.measure(text) + self.space_size
-            if width > self.tree.column("#0", option="width"):
-                self.tree.column("#0", width=width)
+            width += self.text_font.measure(text) + self.space_size
+        
+        if width > self.tree.column("#0", option="width"):
+            self.tree.column("#0", width=ceil(width))
         
         for (i, value) in enumerate(kw.get("values", ())):
             width = self.text_font.measure(value) + self.space_size
