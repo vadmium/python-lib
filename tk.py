@@ -70,17 +70,21 @@ class ScrolledTree(Frame):
         self.space_size = self.heading_font.measure(self.space)
         self.text_font = nametofont("TkTextFont")
     
-    def add(self, values, parent="", *args, **kw):
-        child = self.tree.insert(parent, "end", *args,
-            text=values[0], values=values[1:], **kw)
+    def add(self, parent="", *args, **kw):
+        child = self.tree.insert(parent, "end", *args, **kw)
         if not self.tree.focus():
             self.tree.focus(child)
         
-        for (i, value) in enumerate(values):
-            if i:
-                i = i - 1
-            else:
-                i = "#0"
+        try:
+            text = kw["text"]
+        except LookupError:
+            pass
+        else:
+            width = self.text_font.measure(text) + self.space_size
+            if width > self.tree.column("#0", option="width"):
+                self.tree.column("#0", width=width)
+        
+        for (i, value) in enumerate(kw.get("values", ())):
             width = self.text_font.measure(value) + self.space_size
             if width > self.tree.column(i, option="width"):
                 self.tree.column(i, width=width)
