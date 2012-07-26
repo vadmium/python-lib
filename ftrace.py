@@ -13,7 +13,7 @@ class traced(Function):
             except AttributeError:
                 self.name = repr(func)
             else:
-                if "from" not in abbrev:
+                if "from" not in abbrev and func.__module__ is not None:
                     self.name = "{0}.{1}".format(func.__module__, self.name)
         else:
             self.name = name
