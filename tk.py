@@ -11,11 +11,12 @@ from tkinter.font import nametofont
 from math import ceil
 
 class Form(object):
-    def __init__(self, master):
+    def __init__(self, master, column=0):
         self.master = master
-        self.master.columnconfigure(1, weight=1)
+        self.column = column
+        self.master.columnconfigure(column + 1, weight=1)
         en = font_size(nametofont("TkDefaultFont")["size"] / 2)
-        self.master.columnconfigure(0, pad=en)
+        self.master.columnconfigure(column + 0, pad=en)
     
     def add_field(self, widget, multiline=False, **kw):
         label_sticky = [tkinter.EW]
@@ -25,11 +26,11 @@ class Form(object):
             widget_sticky.append(tkinter.NS)
         
         label = Label(self.master, **kw)
-        label.grid(column=0, sticky=label_sticky)
+        label.grid(column=self.column + 0, sticky=label_sticky)
         row = label.grid_info()["row"]
         if multiline:
             self.master.rowconfigure(row, weight=1)
-        widget.grid(row=row, column=1, sticky=widget_sticky)
+        widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
 class ScrolledTree(Frame):
     def __init__(self, master, columns=None, tree=True, headings=True):
