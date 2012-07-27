@@ -212,7 +212,7 @@ def url_port(url, scheme, ports):
     if not parsed.hostname:
         parsed = urlsplit("//" + url, scheme=scheme)
     if not parsed.hostname:
-        raise ValueError("No host name specified: {0}".format(url))
+        raise ValueError("No host name specified: {0!r}".format(url))
     
     try:
         def_port = ports[parsed.scheme]
