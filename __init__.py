@@ -6,7 +6,6 @@ from sys import argv
 import os
 from types import MethodType
 from functools import partial
-from functools import update_wrapper
 from collections import Set
 
 try:
@@ -33,14 +32,18 @@ class Function(object):
             return self
         return MethodType(self, obj)
 
-class deco_factory(Function):
+class WrapperFunction(Function):
+    from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
+    ASSIGNMENTS = set(WRAPPER_ASSIGNMENTS)
+    ASSIGNMENTS.update("__defaults__, __kwdefaults__, __code__".split(", "))
+    def __init__(self, wrapped, assigned=ASSIGNMENTS, *args, **kw):
+        self.update_wrapper(wrapped, assigned, *args, **kw)
+
+class deco_factory(WrapperFunction):
     """Decorator to create a decorator factory given a function taking the
     factory input and the object to be decorated"""
-    def __init__(self, d):
-        update_wrapper(self, d)
-        self.d = d
     def __call__(self, *args, **kw):
-        return partial(self.d, *args, **kw)
+        return partial(self.__wrapped__, *args, **kw)
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
