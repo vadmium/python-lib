@@ -7,6 +7,7 @@ import os
 from types import MethodType
 from functools import partial
 from functools import update_wrapper
+from collections import Set
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -113,16 +114,20 @@ def run_main(module):
         defaults = dict()
     defaults.update(getattr(main, "__kwdefaults__", None) or dict())
     
-    # First guess non-argument options from any default values
+    # First guess some attributes from any default values
     arg_types = dict()
+    seq_args = set()
     for (opt, value) in defaults.items():
         if value is False:
             arg_types[opt] = True
+        if isinstance(value, (tuple, list, Set)):
+            seq_args.add(opt)
     
     arg_types.update(getattr(main, "arg_types", dict()))
     arg_types.update(getattr(main, "__annotations__", dict()))
+    seq_args.update(getattr(main, "seq_args", ()))
     
-    help_opts = {"help", "_help"}.difference(arg_types.keys())
+    help_opts = {"help", "_help"}.difference(arg_types.keys()) - seq_args
     
     args = list()
     opts = dict()
@@ -144,7 +149,10 @@ def run_main(module):
             
             convert = arg_types.get(opt)
             if convert is True:
-                arg = convert
+                if opt in seq_args:
+                    opts[opt] = opts.get(opt, 0) + 1
+                else:
+                    opts[opt] = convert
             else:
                 try:
                     arg = next(cmd_args)
@@ -156,7 +164,10 @@ def run_main(module):
                         raise
                 if opt in arg_types:
                     arg = convert(arg)
-            opts[opt] = arg
+                if opt in seq_args:
+                    opts.setdefault(opt, list()).append(arg)
+                else:
+                    opts[opt] = arg
         else:
             args.append(arg)
     
