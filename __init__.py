@@ -101,21 +101,26 @@ def run_main(module):
     if module != "__main__":
         return
     main = modules[module].main
-    try:
-        alias_opts = main.alias_opts
-    except AttributeError:
-        alias_opts = dict()
-    try:
-        arg_types = main.arg_types
-    except AttributeError:
-        arg_types = dict()
+    alias_opts = getattr(main, "alias_opts", dict())
     
-    try:
-        ann = main.__annotations__
-    except AttributeError:
-        pass
+    defaults = getattr(main, "__defaults__", None)
+    if defaults:
+        args = main.__code__.co_varnames[:main.__code__.co_argcount]
+        args = args[-len(defaults):]
+        defaults = ((args[i], value) for (i, value) in enumerate(defaults))
+        defaults = dict(defaults)
     else:
-        arg_types.update(ann)
+        defaults = dict()
+    defaults.update(getattr(main, "__kwdefaults__", None) or dict())
+    
+    # First guess non-argument options from any default values
+    arg_types = dict()
+    for (opt, value) in defaults.items():
+        if value is False:
+            arg_types[opt] = True
+    
+    arg_types.update(getattr(main, "arg_types", dict()))
+    arg_types.update(getattr(main, "__annotations__", dict()))
     
     help_opts = {"help", "_help"}.difference(arg_types.keys())
     
