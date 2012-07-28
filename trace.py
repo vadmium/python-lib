@@ -3,6 +3,7 @@ from __future__ import print_function
 
 from sys import stderr
 from lib import Function
+from lib import nop
 
 class traced(Function):
     def __init__(self, func, name=None, abbrev=set()):
@@ -62,10 +63,8 @@ class traced(Function):
 
 def trace(func, *args, **kw):
     return traced(func)(*args, **kw)
-def tracer(name):
+def Tracer(name):
     return traced(nop, name=name, abbrev=set(("return",)))
-def nop(*args, **kw):
-    pass
 
 def print_call(name, args, kw, abbrev=set()):
     print(name, end="(", file=stderr)

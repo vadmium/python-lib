@@ -5,6 +5,8 @@ from sys import modules
 from sys import argv
 import os
 from types import MethodType
+from functools import partial
+from functools import update_wrapper
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -29,6 +31,15 @@ class Function(object):
         if obj is None:
             return self
         return MethodType(self, obj)
+
+class deco_factory(Function):
+    """Decorator to create a decorator factory given a function taking the
+    factory input and the object to be decorated"""
+    def __init__(self, d):
+        update_wrapper(self, d)
+        self.d = d
+    def __call__(self, *args, **kw):
+        return partial(self.d, *args, **kw)
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
@@ -95,9 +106,18 @@ def run_main(module):
     except AttributeError:
         alias_opts = dict()
     try:
-        arg_opts = main.arg_opts
+        arg_types = main.arg_types
     except AttributeError:
-        arg_opts = ()
+        arg_types = dict()
+    
+    try:
+        ann = main.__annotations__
+    except AttributeError:
+        pass
+    else:
+        arg_types.update(ann)
+    
+    help_opts = {"help", "_help"}.difference(arg_types.keys())
     
     args = list()
     opts = dict()
@@ -117,14 +137,39 @@ def run_main(module):
             except LookupError:
                 opt = opt.replace("-", "_")
             
-            if opt in arg_opts:
-                opts[opt] = next(cmd_args)
+            convert = arg_types.get(opt)
+            if convert is True:
+                arg = convert
             else:
-                opts[opt] = True
+                try:
+                    arg = next(cmd_args)
+                except StopIteration:
+                    if opt in help_opts:
+                        help(main)
+                        return
+                    else:
+                        raise
+                if opt in arg_types:
+                    arg = convert(arg)
+            opts[opt] = arg
         else:
             args.append(arg)
     
-    main(*args, **opts)
+    for i in range(len(args)):
+        try:
+            convert = arg_types[i]
+        except LookupError:
+            pass
+        else:
+            args[i] = convert(args[i])
+    
+    try:
+        main(*args, **opts)
+    except TypeError:
+        if help_opts.isdisjoint(opts.keys()):
+            raise
+        else:
+            help(main)
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
@@ -151,9 +196,9 @@ def path_split(path):
             yield component
 
 def strip(s, start="", end=""):
-    if not s.startswith(start):
+    if start and not s.startswith(start):
         raise ValueError("Expected {0!r} starting string".format(start))
-    if not s.endswith(end):
+    if end and not s.endswith(end):
         raise ValueError("Expected {0!r} ending string".format(end))
     if len(s) < len(start) + len(end):
         raise ValueError(
@@ -179,3 +224,35 @@ def url_port(url, scheme, ports):
     path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
     return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
+
+@deco_factory
+def fields(f, *args, **kw):
+    "Decorator factory to add arbitrary fields to function object"
+    f.__dict__.update(*args, **kw)
+    return f
+
+class Cleanup:
+    def __init__(self):
+        self.exits = []
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *exc):
+        while self.exits:
+            if self.exits.pop()(*exc):
+                exc = (None, None, None)
+        return exc == (None, None, None)
+    
+    def __call__(self, context):
+        exit = context.__exit__
+        enter = context.__enter__
+        add_exit = self.exits.append
+        
+        res = enter()
+        add_exit(exit)
+        
+        return res
+
+def nop(*args, **kw):
+    pass
