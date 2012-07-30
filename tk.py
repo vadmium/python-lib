@@ -105,7 +105,8 @@ class ScrolledTree(Frame):
             
             self.auto_width.append(auto)
             width = max(width, self.tree.column(key, option="minwidth"))
-            self.tree.column(key, stretch=False, width=width)
+            stretch = getattr(value, "stretch", False)
+            self.tree.column(key, stretch=stretch, width=width)
     EM = "\N{EM SPACE}"
     FIGURE = "\N{FIGURE SPACE}"
     
