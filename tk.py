@@ -33,18 +33,15 @@ class Form(object):
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
 class ScrolledTree(Frame):
-    def __init__(self, master, columns=None, tree=True, headings=True):
+    def __init__(self, master, columns=1, tree=True, headings=True):
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         
-        if columns is not None:
+        try:
+            self.nontree_columns = len(columns)
+        except TypeError:
             self.nontree_columns = columns
-        else:
-            try:
-                self.nontree_columns = len(headings)
-            except TypeError:
-                self.nontree_columns = 1
         
         show = list()
         self.tree_shown = tree
@@ -68,24 +65,49 @@ class ScrolledTree(Frame):
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
         
-        if headings:
-            try:
-                headings = zip(self.columns(), headings)
-            except TypeError:
-                pass
-            else:
-                for (column, text) in headings:
-                    self.tree.heading(column, text=text)
-        
         self.heading_font = nametofont("TkHeadingFont")
-        self.space = "\N{EN QUAD}"
-        for column in self.columns():
-            text = self.tree.heading(column, option="text")
-            width = self.heading_font.measure(text + self.space)
-            width = max(width, self.tree.column(column, option="minwidth"))
-            self.tree.column(column, stretch=False, width=width)
-        self.space_size = self.heading_font.measure(self.space)
+        self.heading_space = "\N{EN QUAD}"
+        self.space_size = self.heading_font.measure(self.heading_space)
         self.text_font = nametofont("TkTextFont")
+        
+        self.auto_width = list()
+        for (key, value) in zip(self.columns(), columns):
+            if isinstance(value, str):
+                value = Record(heading=value)
+            
+            if headings:
+                try:
+                    heading = value.heading
+                except AttributeError:
+                    pass
+                else:
+                    self.tree.heading(key, text=heading)
+            
+            try:
+                width = value.width
+            except AttributeError:
+                auto = True
+                
+                if headings:
+                    text = self.tree.heading(key, option="text")
+                    text += self.heading_space
+                    width = self.heading_font.measure(text)
+            
+            else:
+                auto = False
+                
+                try:
+                    (width, unit) = width
+                except TypeError:
+                    unit = self.EM
+                width *= self.text_font.measure(unit)
+                width += self.space_size
+            
+            self.auto_width.append(auto)
+            width = max(width, self.tree.column(key, option="minwidth"))
+            self.tree.column(key, stretch=False, width=width)
+    EM = "\N{EM SPACE}"
+    FIGURE = "\N{FIGURE SPACE}"
     
     def columns(self):
         if self.tree_shown:
@@ -98,24 +120,28 @@ class ScrolledTree(Frame):
         if not self.tree.focus():
             self.tree.focus(child)
         
-        width = 1
-        while parent:
-            width += 1
-            parent = self.tree.parent(parent)
-        em = font_size(self.text_font["size"])
-        width *= self.tree.winfo_fpixels(em)
-        
-        try:
-            text = kw["text"]
-        except LookupError:
-            pass
-        else:
-            width += self.text_font.measure(text) + self.space_size
-        
-        if width > self.tree.column("#0", option="width"):
-            self.tree.column("#0", width=ceil(width))
+        auto = iter(self.auto_width)
+        if self.tree_shown and next(auto):
+            width = 1
+            while parent:
+                width += 1
+                parent = self.tree.parent(parent)
+            em = font_size(self.text_font["size"])
+            width *= self.tree.winfo_fpixels(em)
+            
+            try:
+                text = kw["text"]
+            except LookupError:
+                pass
+            else:
+                width += self.text_font.measure(text) + self.space_size
+            
+            if width > self.tree.column("#0", option="width"):
+                self.tree.column("#0", width=ceil(width))
         
         for (i, value) in enumerate(kw.get("values", ())):
+            if not next(auto):
+                continue
             width = self.text_font.measure(value) + self.space_size
             if width > self.tree.column(i, option="width"):
                 self.tree.column(i, width=width)
