@@ -35,9 +35,13 @@ class Function(object):
 class WrapperFunction(Function):
     from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
     ASSIGNMENTS = set(WRAPPER_ASSIGNMENTS)
-    ASSIGNMENTS.update("__defaults__, __kwdefaults__, __code__".split(", "))
+    ASSIGNMENTS.update("__defaults__, __code__".split(", "))
     def __init__(self, wrapped, assigned=ASSIGNMENTS, *args, **kw):
         self.update_wrapper(wrapped, assigned, *args, **kw)
+        try:
+            self.__kwdefaults__ = wrapped.__kwdefaults__
+        except AttributeError:
+            pass
 
 class deco_factory(WrapperFunction):
     """Decorator to create a decorator factory given a function taking the
