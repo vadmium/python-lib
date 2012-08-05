@@ -12,6 +12,8 @@ from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
 from guis import label_key
 from guis import MethodClass
+from win32api import GetSystemMetrics
+from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 
 class Win(object):
     def __init__(self):
@@ -58,6 +60,9 @@ class Win(object):
             (left, top, _, _) = GetWindowRect(self.hwnd)
             width = round(80 * self.x_unit)
             height = self.count * self.label_height
+            width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
+            height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
+            height += GetSystemMetrics(SM_CYCAPTION)
             MoveWindow(self.hwnd, left, top, width, height, 0)
             
             ShowWindow(self.hwnd, SW_SHOWNORMAL)
