@@ -2,6 +2,7 @@ from tkinter.tix import Tk
 from tkinter.ttk import Frame
 from lib.tk import Form
 from guis import MethodClass
+from guis import label_key
 
 class Tix(object):
     def __init__(self):
@@ -20,7 +21,8 @@ class Tix(object):
         def show(self):
             pass
         
-        def add_field(self, label, field):
+        def add_field(self, label, field, key=None):
+            label = label_key(label, key)
             (head, sep, tail) = label.partition("&")
             if sep:
                 kw = dict(underline=len(head))

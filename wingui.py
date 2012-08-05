@@ -10,6 +10,7 @@ from win32con import (WM_DESTROY, WM_CLOSE, WM_SETFONT)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
+from guis import label_key
 from guis import MethodClass
 
 class Win(object):
@@ -62,7 +63,8 @@ class Win(object):
             ShowWindow(self.hwnd, SW_SHOWNORMAL)
             self.gui.visible.add(self)
         
-        def add_field(self, label, field):
+        def add_field(self, label, field, key=None):
+            label = label_key(label, key)
             hwnd = CreateWindowEx(
                 WS_EX_NOPARENTNOTIFY,
                 "STATIC",

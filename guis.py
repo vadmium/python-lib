@@ -8,6 +8,11 @@ def probe():
         return Tix()
     return Win()
 
+def label_key(label, key=None):
+    if key:
+        label = "{label} (&{key})".format_map(locals())
+    return label
+
 class MethodClass(type):
     def __get__(self, obj, cls):
         if obj is None:
