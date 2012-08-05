@@ -48,7 +48,7 @@ class Win(object):
             finally:
                 ReleaseDC(self.hwnd, dc)
             
-            self.count = 0
+            self.height = 0
             self.label_height = round(9 * self.y_unit)
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
@@ -61,7 +61,7 @@ class Win(object):
         def show(self):
             (left, top, _, _) = GetWindowRect(self.hwnd)
             width = round(80 * self.x_unit)
-            height = self.count * self.label_height
+            height = self.height
             width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYCAPTION)
@@ -77,7 +77,7 @@ class Win(object):
                 "STATIC",
                 label,
                 WS_CHILD | WS_VISIBLE,
-                0, self.count * self.label_height, round(80 * self.x_unit), self.label_height,
+                0, self.height, round(80 * self.x_unit), self.label_height,
                 self.hwnd,
                 None,
                 None,
@@ -85,7 +85,7 @@ class Win(object):
             font = GetStockObject(DEFAULT_GUI_FONT)
             SendMessage(hwnd, WM_SETFONT, font, 0 << 0)
             
-            self.count += 1
+            self.height += self.label_height
         
         def start_section(self, label, key=None):
             label = label_key(label, key)
@@ -93,7 +93,7 @@ class Win(object):
                 "BUTTON",
                 label,
                 WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-                0, self.count * self.label_height, round(80 * self.x_unit), self.label_height * 2,
+                0, self.height, round(80 * self.x_unit), 0,
                 self.hwnd,
                 None,
                 None,
@@ -101,14 +101,14 @@ class Win(object):
             font = GetStockObject(DEFAULT_GUI_FONT)
             SendMessage(self.group, WM_SETFONT, font, 0 << 0)
             
-            self.count += 1
+            self.height += self.label_height
         
         def end_section(self):
-            self.count += 1
+            self.height += round(4 * self.y_unit)
             (left, top, right, _) = GetWindowRect(self.group)
             (left, top) = ScreenToClient(self.hwnd, (left, top))
             (right, _) = ScreenToClient(self.hwnd, (right, 0))
-            bottom = self.count * self.label_height
+            bottom = self.height
             MoveWindow(self.group, left, top, right - left, bottom - top, 0)
 
 DEFAULT_GUI_FONT = 17
