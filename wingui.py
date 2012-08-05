@@ -17,7 +17,7 @@ from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import BS_GROUPBOX
 from win32api import (LOWORD, HIWORD)
-from itertools import chain
+from win32con import ES_AUTOHSCROLL
 
 class Win(object):
     def __init__(self):
@@ -79,35 +79,36 @@ class Win(object):
             cx = LOWORD(lparam)
             cy = HIWORD(lparam)
             
-            for group in chain(self.groups, self.fields):
+            for group in self.groups:
                 (left, top, _, bottom) = GetWindowRect(group)
                 (left, top) = ScreenToClient(self.hwnd, (left, top))
                 (_, bottom) = ScreenToClient(self.hwnd, (0, bottom))
                 MoveWindow(group, left, top, cx - left, bottom - top, 1)
+            
+            for field in self.fields:
+                (left, top, _, height) = field.geom()
+                field.move(left, top, cx - left, height)
             
             return 1
         
         def add_field(self, label, field, key=None):
             label = label_key(label, key)
             
-            entry_height = round(12 * self.y_unit)
+            field.set_parent(self)
+            entry_height = field.height
             field_height = max(self.label_height, entry_height)
             create_control(self.hwnd, "STATIC",
                 text=label,
                 y=self.height + (field_height - self.label_height) // 2,
                 width=round(80 * self.x_unit), height=self.label_height,
             )
-            field = create_control(self.hwnd, "EDIT",
-                tabstop=True,
-                text=field,
+            field.place(
                 x=round(80 * self.x_unit),
                 y=self.height + (field_height - entry_height) // 2,
-                height=entry_height,
-                ex_style=WS_EX_CLIENTEDGE,
             )
             if not self.fields:
-                SendMessage(field, EM_SETSEL, 0, -1) # check DLGC_HASSETSEL first
-                SetFocus(field)
+                SendMessage(field.hwnd, EM_SETSEL, 0, -1) # check DLGC_HASSETSEL first
+                SetFocus(field.hwnd)
             self.fields.append(field)
             
             self.height += field_height
@@ -125,6 +126,33 @@ class Win(object):
             (left, top, _, _) = GetWindowRect(self.groups[-1])
             (left, top) = ScreenToClient(self.hwnd, (left, top))
             MoveWindow(self.groups[-1], left, top, 0, self.height - top, 0)
+    
+    class Entry(object):
+        def __init__(self, value=None):
+            self.value = value
+        
+        def set_parent(self, parent):
+            self.parent = parent.hwnd
+            self.height = round(12 * parent.y_unit)
+        
+        def place(self, x, y):
+            self.hwnd = create_control(self.parent, "EDIT",
+                tabstop=True,
+                text=self.value,
+                x=x, y=y,
+                height=self.height,
+                style=ES_AUTOHSCROLL,
+                ex_style=WS_EX_CLIENTEDGE,
+            )
+        
+        def geom(self):
+            (left, top, right, _) = GetWindowRect(self.hwnd)
+            width = right - left
+            (left, top) = ScreenToClient(self.parent, (left, top))
+            return (left, top, width, self.height)
+        
+        def move(self, left, top, width, height):
+            MoveWindow(self.hwnd, left, top, width, self.height, 1)
 
 def create_control(parent, wndclass, text=None,
     tabstop=False, style=0,

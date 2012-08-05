@@ -52,6 +52,10 @@ class Tix(object):
             master.columnconfigure(self.form.column - 1, minsize=self.side)
             master.columnconfigure(self.form.column + 2, minsize=self.side)
             master.rowconfigure(rows, minsize=self.side)
+    
+    class Entry(object):
+        def __init__(self, value=None):
+            pass
 
 def convert_label(label, key=None):
     label = label_key(label, key)
