@@ -1,13 +1,13 @@
 from win32gui import (PumpMessages, PostQuitMessage, SendMessage)
 from win32gui import (
     CreateDialogIndirect,
-    CreateWindowEx, DestroyWindow, ShowWindow,
+    CreateWindowEx, DestroyWindow, ShowWindow, SetFocus,
     GetDC, ReleaseDC,
     GetWindowRect, MoveWindow, ScreenToClient,
 )
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
-from win32con import WS_EX_NOPARENTNOTIFY
-from win32con import (WM_DESTROY, WM_CLOSE, WM_SETFONT, WM_SIZE)
+from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
+from win32con import (WM_DESTROY, WM_CLOSE, WM_SETFONT, WM_SIZE, EM_SETSEL)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
@@ -17,6 +17,7 @@ from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import BS_GROUPBOX
 from win32api import (LOWORD, HIWORD)
+from itertools import chain
 
 class Win(object):
     def __init__(self):
@@ -50,6 +51,7 @@ class Win(object):
             finally:
                 ReleaseDC(self.hwnd, dc)
             
+            self.fields = list()
             self.groups = list()
             self.height = 0
             self.label_height = round(9 * self.y_unit)
@@ -77,7 +79,7 @@ class Win(object):
             cx = LOWORD(lparam)
             cy = HIWORD(lparam)
             
-            for group in self.groups:
+            for group in chain(self.groups, self.fields):
                 (left, top, _, bottom) = GetWindowRect(group)
                 (left, top) = ScreenToClient(self.hwnd, (left, top))
                 (_, bottom) = ScreenToClient(self.hwnd, (0, bottom))
@@ -87,12 +89,28 @@ class Win(object):
         
         def add_field(self, label, field, key=None):
             label = label_key(label, key)
+            
+            entry_height = round(12 * self.y_unit)
+            field_height = max(self.label_height, entry_height)
             create_control(self.hwnd, "STATIC",
                 text=label,
-                y=self.height,
+                y=self.height + (field_height - self.label_height) // 2,
                 width=round(80 * self.x_unit), height=self.label_height,
             )
-            self.height += self.label_height
+            field = create_control(self.hwnd, "EDIT",
+                tabstop=True,
+                text=field,
+                x=round(80 * self.x_unit),
+                y=self.height + (field_height - entry_height) // 2,
+                height=entry_height,
+                ex_style=WS_EX_CLIENTEDGE,
+            )
+            if not self.fields:
+                SendMessage(field, EM_SETSEL, 0, -1) # check DLGC_HASSETSEL first
+                SetFocus(field)
+            self.fields.append(field)
+            
+            self.height += field_height
         
         def start_section(self, label, key=None):
             label = label_key(label, key)
