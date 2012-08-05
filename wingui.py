@@ -1,8 +1,9 @@
 from win32gui import (PumpMessages, PostQuitMessage, SendMessage)
 from win32gui import (
-    CreateDialogIndirect, CreateWindowEx, DestroyWindow, ShowWindow,
+    CreateDialogIndirect,
+    CreateWindow, CreateWindowEx, DestroyWindow, ShowWindow,
     GetDC, ReleaseDC,
-    GetWindowRect, MoveWindow,
+    GetWindowRect, MoveWindow, ScreenToClient,
 )
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD)
 from win32con import WS_EX_NOPARENTNOTIFY
@@ -14,6 +15,7 @@ from guis import label_key
 from guis import MethodClass
 from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
+from win32con import BS_GROUPBOX
 
 class Win(object):
     def __init__(self):
@@ -84,5 +86,29 @@ class Win(object):
             SendMessage(hwnd, WM_SETFONT, font, 0 << 0)
             
             self.count += 1
+        
+        def start_section(self, label, key=None):
+            label = label_key(label, key)
+            self.group = CreateWindow(
+                "BUTTON",
+                label,
+                WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+                0, self.count * self.label_height, round(80 * self.x_unit), self.label_height * 2,
+                self.hwnd,
+                None,
+                None,
+            None)
+            font = GetStockObject(DEFAULT_GUI_FONT)
+            SendMessage(self.group, WM_SETFONT, font, 0 << 0)
+            
+            self.count += 1
+        
+        def end_section(self):
+            self.count += 1
+            (left, top, right, _) = GetWindowRect(self.group)
+            (left, top) = ScreenToClient(self.hwnd, (left, top))
+            (right, _) = ScreenToClient(self.hwnd, (right, 0))
+            bottom = self.count * self.label_height
+            MoveWindow(self.group, left, top, right - left, bottom - top, 0)
 
 DEFAULT_GUI_FONT = 17
