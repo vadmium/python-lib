@@ -1,11 +1,11 @@
 from win32gui import (PumpMessages, PostQuitMessage, SendMessage)
 from win32gui import (
     CreateDialogIndirect,
-    CreateWindow, CreateWindowEx, DestroyWindow, ShowWindow,
+    CreateWindowEx, DestroyWindow, ShowWindow,
     GetDC, ReleaseDC,
     GetWindowRect, MoveWindow, ScreenToClient,
 )
-from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD)
+from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
 from win32con import WS_EX_NOPARENTNOTIFY
 from win32con import (WM_DESTROY, WM_CLOSE, WM_SETFONT)
 from win32con import SW_SHOWNORMAL
@@ -72,35 +72,19 @@ class Win(object):
         
         def add_field(self, label, field, key=None):
             label = label_key(label, key)
-            hwnd = CreateWindowEx(
-                WS_EX_NOPARENTNOTIFY,
-                "STATIC",
-                label,
-                WS_CHILD | WS_VISIBLE,
-                0, self.height, round(80 * self.x_unit), self.label_height,
-                self.hwnd,
-                None,
-                None,
-            None)
-            font = GetStockObject(DEFAULT_GUI_FONT)
-            SendMessage(hwnd, WM_SETFONT, font, 0 << 0)
-            
+            create_control(self.hwnd, "STATIC",
+                text=label,
+                y=self.height,
+                width=round(80 * self.x_unit), height=self.label_height,
+            )
             self.height += self.label_height
         
         def start_section(self, label, key=None):
             label = label_key(label, key)
-            self.group = CreateWindow(
-                "BUTTON",
-                label,
-                WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-                0, self.height, round(80 * self.x_unit), 0,
-                self.hwnd,
-                None,
-                None,
-            None)
-            font = GetStockObject(DEFAULT_GUI_FONT)
-            SendMessage(self.group, WM_SETFONT, font, 0 << 0)
-            
+            create_control(self.hwnd, "BUTTON",
+                style=BS_GROUPBOX, text=label,
+                y=self.height, width=round(80 * self.x_unit),
+            )
             self.height += self.label_height
         
         def end_section(self):
@@ -110,5 +94,24 @@ class Win(object):
             (right, _) = ScreenToClient(self.hwnd, (right, 0))
             bottom = self.height
             MoveWindow(self.group, left, top, right - left, bottom - top, 0)
+
+def create_control(parent, wndclass, text=None,
+    tabstop=False, style=0,
+    x=0, y=0, width=0, height=0,
+    ex_style=0,
+):
+    style |= tabstop * WS_TABSTOP
+    hwnd = CreateWindowEx(
+        WS_EX_NOPARENTNOTIFY | ex_style,
+        wndclass,
+        text,
+        WS_CHILD | WS_VISIBLE | style,
+        x, y, width, height,
+        parent,
+        None,
+        None,
+    None)
+    SendMessage(hwnd, WM_SETFONT, GetStockObject(DEFAULT_GUI_FONT), 0 << 0)
+    return hwnd
 
 DEFAULT_GUI_FONT = 17
