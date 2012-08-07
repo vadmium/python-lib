@@ -4,7 +4,7 @@ import tkinter
 from tkinter.font import nametofont
 from lib.tk import font_size
 from lib.tk import Form
-from guis import MethodClass
+from guis import InnerClass
 from guis import label_key
 
 class Ttk(object):
@@ -14,7 +14,7 @@ class Ttk(object):
     def msg_loop(self):
         self.root.mainloop()
     
-    class Window(object, metaclass=MethodClass):
+    class Window(object, metaclass=InnerClass):
         def __init__(self, gui, title=None):
             if title is not None:
                 gui.root.title(title)

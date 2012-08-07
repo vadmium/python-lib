@@ -12,7 +12,7 @@ from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
 from guis import label_key
-from guis import MethodClass
+from guis import InnerClass
 from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import BS_GROUPBOX
@@ -27,7 +27,7 @@ class Win(object):
         if self.visible:
             PumpMessages()
     
-    class Window(object, metaclass=MethodClass):
+    class Window(object, metaclass=InnerClass):
         def __init__(self, gui, title=None):
             self.gui = gui
             

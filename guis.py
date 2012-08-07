@@ -1,4 +1,4 @@
-from types import MethodType
+from lib import Function
 
 def probe():
     try:
@@ -13,8 +13,15 @@ def label_key(label, key=None):
         label = "{label} (&{key})".format_map(locals())
     return label
 
-class MethodClass(type):
-    def __get__(self, obj, cls):
-        if obj is None:
+class InnerClass(type):
+    def __get__(self, outer, outer_class):
+        if outer is None:
             return self
-        return MethodType(self, obj)
+        vars = dict(__init__=BoundInit(self, outer))
+        return type(self.__name__, (self,), vars)
+class BoundInit(Function):
+    def __init__(self, type, outer):
+        self.type = type
+        self.outer = outer
+    def __call__(self, inner, *args, **kw):
+        return self.type.__init__(inner, self.outer, *args, **kw)
