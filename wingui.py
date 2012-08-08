@@ -1,13 +1,14 @@
 from win32gui import (PumpMessages, PostQuitMessage, SendMessage)
 from win32gui import (
     CreateDialogIndirect,
-    CreateWindowEx, DestroyWindow, ShowWindow, SetFocus,
+    CreateWindowEx, DestroyWindow, ShowWindow,
     GetDC, ReleaseDC,
     GetWindowRect, MoveWindow, ScreenToClient,
 )
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
 from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
-from win32con import (WM_DESTROY, WM_CLOSE, WM_SETFONT, WM_SIZE, EM_SETSEL)
+from win32con import (WM_DESTROY, WM_CLOSE, WM_SIZE)
+from win32con import (WM_SETFONT, WM_INITDIALOG)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
@@ -28,16 +29,32 @@ class Win(object):
             PumpMessages()
     
     class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, title=None):
+        def __init__(self, gui, title=None, *, sections):
             self.gui = gui
             
             template = (title, (0, 0, 0, 0), WS_OVERLAPPEDWINDOW)
             handlers = {
+                WM_INITDIALOG: self.on_init_dialog,
                 WM_DESTROY: self.on_destroy,
                 WM_CLOSE: self.on_close,
                 WM_SIZE: self.on_size,
             }
-            self.hwnd = CreateDialogIndirect(None, (template,), 0, handlers)
+            self.sections = sections
+            CreateDialogIndirect(None, (template,), 0, handlers)
+            
+            (left, top, _, _) = GetWindowRect(self.hwnd)
+            width = round(80 * self.x_unit) + round(160 * self.x_unit)
+            height = self.height
+            width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
+            height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
+            height += GetSystemMetrics(SM_CYCAPTION)
+            MoveWindow(self.hwnd, left, top, width, height, 0)
+            
+            ShowWindow(self.hwnd, SW_SHOWNORMAL)
+            self.gui.visible.add(self)
+        
+        def on_init_dialog(self, hwnd, msg, wparam, lparam):
+            self.hwnd = hwnd
             
             dc = GetDC(self.hwnd)
             try:
@@ -54,7 +71,39 @@ class Win(object):
             self.fields = list()
             self.groups = list()
             self.height = 0
-            self.label_height = round(9 * self.y_unit)
+            label_height = round(9 * self.y_unit)
+            
+            for section in self.sections:
+                label = label_key(section["label"], section.get("access"))
+                self.groups.append(create_control(self.hwnd, "BUTTON",
+                    style=BS_GROUPBOX, text=label,
+                ))
+                group_top = self.height
+                self.height += label_height
+                
+                for field in section["fields"]:
+                    label = label_key(field["label"], field.get("access"))
+                    field = field["field"]
+                    
+                    field.set_parent(self)
+                    entry_height = field.height
+                    field_height = max(label_height, entry_height)
+                    create_control(self.hwnd, "STATIC",
+                        text=label,
+                        y=self.height + (field_height - label_height) // 2,
+                        width=round(80 * self.x_unit), height=label_height,
+                    )
+                    field.place(
+                        x=round(80 * self.x_unit),
+                        y=self.height + (field_height - entry_height) // 2,
+                    )
+                    self.fields.append(field)
+                    
+                    self.height += field_height
+                
+                self.height += round(4 * self.y_unit)
+                group_height = self.height - group_top
+                MoveWindow(self.groups[-1], 0, group_top, 0, group_height, 0)
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
             self.gui.visible.remove(self)
@@ -62,18 +111,6 @@ class Win(object):
         
         def on_close(self, hwnd, msg, wparam, lparam):
             DestroyWindow(self.hwnd)
-        
-        def show(self):
-            (left, top, _, _) = GetWindowRect(self.hwnd)
-            width = round(80 * self.x_unit) + round(160 * self.x_unit)
-            height = self.height
-            width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
-            height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
-            height += GetSystemMetrics(SM_CYCAPTION)
-            MoveWindow(self.hwnd, left, top, width, height, 0)
-            
-            ShowWindow(self.hwnd, SW_SHOWNORMAL)
-            self.gui.visible.add(self)
         
         def on_size(self, hwnd, msg, wparam, lparam):
             cx = LOWORD(lparam)
@@ -90,42 +127,6 @@ class Win(object):
                 field.move(left, top, cx - left, height)
             
             return 1
-        
-        def add_field(self, label, field, key=None):
-            label = label_key(label, key)
-            
-            field.set_parent(self)
-            entry_height = field.height
-            field_height = max(self.label_height, entry_height)
-            create_control(self.hwnd, "STATIC",
-                text=label,
-                y=self.height + (field_height - self.label_height) // 2,
-                width=round(80 * self.x_unit), height=self.label_height,
-            )
-            field.place(
-                x=round(80 * self.x_unit),
-                y=self.height + (field_height - entry_height) // 2,
-            )
-            if not self.fields:
-                SendMessage(field.hwnd, EM_SETSEL, 0, -1) # check DLGC_HASSETSEL first
-                SetFocus(field.hwnd)
-            self.fields.append(field)
-            
-            self.height += field_height
-        
-        def start_section(self, label, key=None):
-            label = label_key(label, key)
-            self.groups.append(create_control(self.hwnd, "BUTTON",
-                style=BS_GROUPBOX, text=label,
-                y=self.height,
-            ))
-            self.height += self.label_height
-        
-        def end_section(self):
-            self.height += round(4 * self.y_unit)
-            (left, top, _, _) = GetWindowRect(self.groups[-1])
-            (left, top) = ScreenToClient(self.hwnd, (left, top))
-            MoveWindow(self.groups[-1], left, top, 0, self.height - top, 0)
     
     class Entry(object):
         def __init__(self, value=None):
