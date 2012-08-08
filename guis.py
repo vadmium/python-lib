@@ -4,8 +4,8 @@ def probe():
     try:
         from wingui import Win
     except ImportError:
-        from tkgui import Tix
-        return Tix()
+        from tkgui import Ttk
+        return Ttk()
     return Win()
 
 def label_key(label, key=None):

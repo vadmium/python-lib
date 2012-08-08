@@ -1,4 +1,4 @@
-from tkinter.tix import Tk
+from tkinter import Tk
 from tkinter.ttk import (Frame, LabelFrame)
 import tkinter
 from tkinter.font import nametofont
@@ -7,7 +7,7 @@ from lib.tk import Form
 from guis import MethodClass
 from guis import label_key
 
-class Tix(object):
+class Ttk(object):
     def __init__(self):
         self.root = Tk()
     
