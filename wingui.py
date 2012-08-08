@@ -16,7 +16,7 @@ from guis import label_key
 from guis import InnerClass
 from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
-from win32con import BS_GROUPBOX
+from win32con import (BS_GROUPBOX, BS_PUSHBUTTON)
 from win32api import (LOWORD, HIWORD)
 from win32con import ES_AUTOHSCROLL
 
@@ -145,15 +145,71 @@ class Win(object):
                 style=ES_AUTOHSCROLL,
                 ex_style=WS_EX_CLIENTEDGE,
             )
+            self.top = y
         
         def geom(self):
-            (left, top, right, _) = GetWindowRect(self.hwnd)
+            (left, _, right, _) = GetWindowRect(self.hwnd)
             width = right - left
-            (left, top) = ScreenToClient(self.parent, (left, top))
-            return (left, top, width, self.height)
+            (left, _) = ScreenToClient(self.parent, (left, 0))
+            return (left, self.top, width, self.height)
         
         def move(self, left, top, width, height):
+            self.top = top
+            top += (height - self.height) // 2
             MoveWindow(self.hwnd, left, top, width, self.height, 1)
+    
+    class Button(object):
+        def __init__(self, label, access=None):
+            self.label = label_key(label, access)
+        
+        def set_parent(self, parent):
+            self.parent = parent.hwnd
+            self.width = round(50 * parent.x_unit)
+            self.height = round(14 * parent.y_unit)
+        
+        def place(self, x, y):
+            self.hwnd = create_control(self.parent, "BUTTON",
+                style=BS_PUSHBUTTON,
+                tabstop=True,
+                text=self.label,
+                x=x, y=y,
+                width=self.width, height=self.height,
+            )
+        
+        def geom(self):
+            (left, top, _, _) = GetWindowRect(self.hwnd)
+            (left, top) = ScreenToClient(self.parent, (left, top))
+            return (left, top, self.width, self.height)
+        
+        def move(self, left, top, width, height):
+            top += (height - self.height) // 2
+            MoveWindow(self.hwnd, left, top, self.width, self.height, 1)
+    
+    class Layout(object):
+        def __init__(self, cells):
+            self.cells = cells
+        
+        def set_parent(self, parent):
+            self.height = 0
+            for cell in self.cells:
+                cell.set_parent(parent)
+                self.height = max(self.height, cell.height)
+        
+        def place(self, x, y):
+            for cell in self.cells:
+                cell.place(x, y)
+        
+        def geom(self):
+            return self.cells[0].geom()
+        
+        def move(self, left, top, width, height):
+            for cell in self.cells[1:]:
+                width -= cell.width
+            self.cells[0].move(left, top, width, self.height)
+            left += width
+            for cell in self.cells[1:]:
+                cell.move(left, top, 0, self.height)
+                left += cell.width
 
 def create_control(parent, wndclass, text=None,
     tabstop=False, style=0,
