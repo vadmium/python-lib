@@ -23,6 +23,7 @@ from commctrl import LVM_GETEXTENDEDLISTVIEWSTYLE
 from commctrl import LVM_SETEXTENDEDLISTVIEWSTYLE
 from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT, LVM_INSERTCOLUMNW)
 from win32gui_struct import PackLVCOLUMN
+from collections import Mapping
 from win32gui import InitCommonControls
 from win32con import ES_AUTOHSCROLL
 
@@ -85,6 +86,7 @@ class Win(object):
                 self.label_height = round(9 * self.y_unit)
                 
                 self.fixed_height = 0
+                self.var_heights = 0
                 for section in self.sections:
                     access = section.pop("access", None)
                     label = label_key(section.pop("label"), access)
@@ -94,17 +96,22 @@ class Win(object):
                     self.fixed_height += self.label_height
                     
                     for field in section["fields"]:
-                        access = field.pop("access", None)
-                        label = label_key(field.pop("label"), access)
-                        target = field["field"]
+                        if isinstance(field, Mapping):
+                            access = field.pop("access", None)
+                            label = label_key(field.pop("label"), access)
+                            target = field["field"]
+                            
+                            field["label"] = create_control(self.hwnd,
+                                "STATIC", text=label)
+                        else:
+                            target = field
                         
-                        field["label"] = create_control(self.hwnd, "STATIC",
-                            text=label,
-                        )
                         target.place_on(self)
                         if target.height:
                             self.fixed_height += max(self.label_height,
                                 target.height)
+                        else:
+                            self.var_heights += 1
                     
                     self.fixed_height += round(4 * self.y_unit)
             
@@ -123,21 +130,30 @@ class Win(object):
             cy = HIWORD(lparam)
             
             y = 0
+            spare_height = cy - self.fixed_height
             for section in self.sections:
                 group_top = y
                 y += self.label_height
                 for field in section["fields"]:
-                    target = field["field"]
+                    if isinstance(field, Mapping):
+                        target = field["field"]
+                    else:
+                        target = field
+                    
                     if target.height:
                         field_height = max(self.label_height, target.height)
                         label_y = y + (field_height - self.label_height) // 2
                     else:
-                        field_height = cy - self.fixed_height
+                        field_height = spare_height // self.var_heights
+                        spare_height += 1 # Distribute rounding from division
                         label_y = y
                     
-                    label_width = round(80 * self.x_unit)
-                    MoveWindow(field["label"],
-                        0, label_y, label_width, self.label_height, 1)
+                    if isinstance(field, Mapping):
+                        label_width = round(80 * self.x_unit)
+                        MoveWindow(field["label"],
+                            0, label_y, label_width, self.label_height, 1)
+                    else:
+                        label_width = 0
                     
                     target_width = cx - label_width
                     target.move(label_width, y, target_width, field_height)
