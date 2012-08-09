@@ -3,7 +3,7 @@ from win32gui import (
     CreateDialogIndirect,
     CreateWindowEx, DestroyWindow, ShowWindow,
     GetDC, ReleaseDC,
-    GetWindowRect, MoveWindow, ScreenToClient,
+    GetWindowRect, MoveWindow,
 )
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
 from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
@@ -42,9 +42,15 @@ class Win(object):
             self.sections = sections
             CreateDialogIndirect(None, (template,), 0, handlers)
             
+            height = 0
+            for section in self.sections:
+                height += self.label_height
+                for field in section["fields"]:
+                    height += field["field"].height
+                height += round(4 * self.y_unit)
+            
             (left, top, _, _) = GetWindowRect(self.hwnd)
             width = round(80 * self.x_unit) + round(160 * self.x_unit)
-            height = self.height
             width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYCAPTION)
@@ -68,42 +74,24 @@ class Win(object):
             finally:
                 ReleaseDC(self.hwnd, dc)
             
-            self.fields = list()
-            self.groups = list()
-            self.height = 0
-            label_height = round(9 * self.y_unit)
+            self.label_height = round(9 * self.y_unit)
             
             for section in self.sections:
-                label = label_key(section["label"], section.get("access"))
-                self.groups.append(create_control(self.hwnd, "BUTTON",
+                access = section.pop("access", None)
+                label = label_key(section.pop("label"), access)
+                section["hwnd"] = create_control(self.hwnd, "BUTTON",
                     style=BS_GROUPBOX, text=label,
-                ))
-                group_top = self.height
-                self.height += label_height
+                )
                 
                 for field in section["fields"]:
-                    label = label_key(field["label"], field.get("access"))
-                    field = field["field"]
+                    access = field.pop("access", None)
+                    label = label_key(field.pop("label"), access)
+                    control = field["field"]
                     
-                    field.set_parent(self)
-                    entry_height = field.height
-                    field_height = max(label_height, entry_height)
-                    create_control(self.hwnd, "STATIC",
+                    field["label"] = create_control(self.hwnd, "STATIC",
                         text=label,
-                        y=self.height + (field_height - label_height) // 2,
-                        width=round(80 * self.x_unit), height=label_height,
                     )
-                    field.place(
-                        x=round(80 * self.x_unit),
-                        y=self.height + (field_height - entry_height) // 2,
-                    )
-                    self.fields.append(field)
-                    
-                    self.height += field_height
-                
-                self.height += round(4 * self.y_unit)
-                group_height = self.height - group_top
-                MoveWindow(self.groups[-1], 0, group_top, 0, group_height, 0)
+                    control.place_on(self)
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
             self.gui.visible.remove(self)
@@ -116,15 +104,28 @@ class Win(object):
             cx = LOWORD(lparam)
             cy = HIWORD(lparam)
             
-            for group in self.groups:
-                (left, top, _, bottom) = GetWindowRect(group)
-                (left, top) = ScreenToClient(self.hwnd, (left, top))
-                (_, bottom) = ScreenToClient(self.hwnd, (0, bottom))
-                MoveWindow(group, left, top, cx - left, bottom - top, 1)
-            
-            for field in self.fields:
-                (left, top, _, height) = field.geom()
-                field.move(left, top, cx - left, height)
+            y = 0
+            for section in self.sections:
+                group_top = y
+                y += self.label_height
+                for field in section["fields"]:
+                    target = field["field"]
+                    field_height = max(self.label_height, target.height)
+                    
+                    label_y = y + (field_height - self.label_height) // 2
+                    label_width = round(80 * self.x_unit)
+                    MoveWindow(field["label"],
+                        0, label_y, label_width, self.label_height, 1)
+                    
+                    target_width = cx - label_width
+                    target.move(label_width, y, target_width, field_height)
+                    
+                    y += field_height
+                
+                y += round(4 * self.y_unit)
+                group_height = y - group_top
+                MoveWindow(section["hwnd"],
+                    0, group_top, cx, group_height, 1)
             
             return 1
     
@@ -132,29 +133,17 @@ class Win(object):
         def __init__(self, value=None):
             self.value = value
         
-        def set_parent(self, parent):
+        def place_on(self, parent):
             self.parent = parent.hwnd
             self.height = round(12 * parent.y_unit)
-        
-        def place(self, x, y):
             self.hwnd = create_control(self.parent, "EDIT",
                 tabstop=True,
                 text=self.value,
-                x=x, y=y,
-                height=self.height,
                 style=ES_AUTOHSCROLL,
                 ex_style=WS_EX_CLIENTEDGE,
             )
-            self.top = y
-        
-        def geom(self):
-            (left, _, right, _) = GetWindowRect(self.hwnd)
-            width = right - left
-            (left, _) = ScreenToClient(self.parent, (left, 0))
-            return (left, self.top, width, self.height)
         
         def move(self, left, top, width, height):
-            self.top = top
             top += (height - self.height) // 2
             MoveWindow(self.hwnd, left, top, width, self.height, 1)
     
@@ -162,24 +151,15 @@ class Win(object):
         def __init__(self, label, access=None):
             self.label = label_key(label, access)
         
-        def set_parent(self, parent):
+        def place_on(self, parent):
             self.parent = parent.hwnd
             self.width = round(50 * parent.x_unit)
             self.height = round(14 * parent.y_unit)
-        
-        def place(self, x, y):
             self.hwnd = create_control(self.parent, "BUTTON",
                 style=BS_PUSHBUTTON,
                 tabstop=True,
                 text=self.label,
-                x=x, y=y,
-                width=self.width, height=self.height,
             )
-        
-        def geom(self):
-            (left, top, _, _) = GetWindowRect(self.hwnd)
-            (left, top) = ScreenToClient(self.parent, (left, top))
-            return (left, top, self.width, self.height)
         
         def move(self, left, top, width, height):
             top += (height - self.height) // 2
@@ -189,18 +169,11 @@ class Win(object):
         def __init__(self, cells):
             self.cells = cells
         
-        def set_parent(self, parent):
+        def place_on(self, parent):
             self.height = 0
             for cell in self.cells:
-                cell.set_parent(parent)
+                cell.place_on(parent)
                 self.height = max(self.height, cell.height)
-        
-        def place(self, x, y):
-            for cell in self.cells:
-                cell.place(x, y)
-        
-        def geom(self):
-            return self.cells[0].geom()
         
         def move(self, left, top, width, height):
             for cell in self.cells[1:]:
