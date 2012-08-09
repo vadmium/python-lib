@@ -174,6 +174,7 @@ class Win(object):
         def place_on(self, parent):
             self.parent = parent.hwnd
             self.height = round(12 * parent.y_unit)
+            self.width = 0
             self.hwnd = create_control(self.parent, "EDIT",
                 tabstop=True,
                 text=self.value,
@@ -200,6 +201,7 @@ class Win(object):
             )
         
         def move(self, left, top, width, height):
+            left += (width - self.width) // 2
             top += (height - self.height) // 2
             MoveWindow(self.hwnd, left, top, self.width, self.height, 1)
     
@@ -239,18 +241,31 @@ class Win(object):
         
         def place_on(self, parent):
             self.height = 0
+            self.fixed_width = 0
+            self.var_widths = 0
             for cell in self.cells:
                 cell.place_on(parent)
                 self.height = max(self.height, cell.height)
+                
+                if cell.width:
+                    self.fixed_width += cell.width
+                else:
+                    self.var_widths += 1
         
         def move(self, left, top, width, height):
-            for cell in self.cells[1:]:
-                width -= cell.width
-            self.cells[0].move(left, top, width, self.height)
-            left += width
-            for cell in self.cells[1:]:
-                cell.move(left, top, 0, self.height)
-                left += cell.width
+            var_widths = self.var_widths
+            all_vary = not var_widths
+            if all_vary:
+                var_widths = len(self.cells)
+            
+            width -= self.fixed_width
+            for cell in self.cells:
+                cell_width = cell.width
+                if all_vary or not cell_width:
+                    cell_width += width // var_widths
+                    width += 1  # Distribute rounding from the division
+                cell.move(left, top, cell_width, self.height)
+                left += cell_width
 
 def create_control(parent, wndclass, text=None,
     tabstop=False, style=0,
