@@ -49,8 +49,8 @@ class Win(object):
             }
             self.sections = sections
             
-            self.commands = list()
-            self.commands.append(nop)  # Id. 0 seems already used
+            self.commands = dict()
+            self.id = 1024
             
             self.init_exc = None
             try:
@@ -182,7 +182,11 @@ class Win(object):
         
         def on_command(self, hwnd, msg, wparam, lparam):
             id = LOWORD(wparam)
-            self.commands[id]()
+            try:
+                command = self.commands[id]
+            except LookupError:
+                return
+            command()
     
     class Entry(object):
         def __init__(self, value=None):
@@ -211,8 +215,9 @@ class Win(object):
         def place_on(self, parent):
             self.parent = parent.hwnd
             if self.command:
-                id = len(parent.commands)
-                parent.commands.append(self.command)
+                id = parent.id
+                parent.id += 1
+                parent.commands[id] = self.command
             else:
                 id = None
             
