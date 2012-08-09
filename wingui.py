@@ -18,6 +18,12 @@ from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import (BS_GROUPBOX, BS_PUSHBUTTON)
 from win32api import (LOWORD, HIWORD)
+from commctrl import (LVS_SHOWSELALWAYS, LVS_REPORT, WC_LISTVIEW)
+from commctrl import LVM_GETEXTENDEDLISTVIEWSTYLE
+from commctrl import LVM_SETEXTENDEDLISTVIEWSTYLE
+from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT, LVM_INSERTCOLUMNW)
+from win32gui_struct import PackLVCOLUMN
+from win32gui import InitCommonControls
 from win32con import ES_AUTOHSCROLL
 
 class Win(object):
@@ -175,6 +181,36 @@ class Win(object):
         def move(self, left, top, width, height):
             top += (height - self.height) // 2
             MoveWindow(self.hwnd, left, top, self.width, self.height, 1)
+    
+    class List(object):
+        def __init__(self, headings):
+            self.headings = headings
+        
+        def place_on(self, parent):
+            self.parent = parent.hwnd
+            self.height = round(5 * 8 * parent.y_unit)
+            InitCommonControls()
+            self.hwnd = create_control(self.parent, WC_LISTVIEW,
+                style=LVS_SHOWSELALWAYS | LVS_REPORT,
+                tabstop=True,
+                ex_style=WS_EX_CLIENTEDGE,
+            )
+            
+            style = SendMessage(self.hwnd, LVM_GETEXTENDEDLISTVIEWSTYLE,
+                0, 0)
+            style |= LVS_EX_FULLROWSELECT
+            SendMessage(self.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, style)
+            
+            self.columns = list()
+            for (i, heading) in enumerate(self.headings):
+                (param, obj) = PackLVCOLUMN(
+                    fmt=LVCFMT_LEFT, text=heading, cx=50,
+                )
+                self.columns.append(obj)
+                SendMessage(self.hwnd, LVM_INSERTCOLUMNW, i, param)
+        
+        def move(self, left, top, width, height):
+            MoveWindow(self.hwnd, left, top, width, height, 1)
     
     class Layout(object):
         def __init__(self, cells):
