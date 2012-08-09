@@ -1,7 +1,7 @@
 from win32gui import (PumpMessages, PostQuitMessage, SendMessage)
 from win32gui import (
     CreateDialogIndirect,
-    CreateWindowEx, DestroyWindow, ShowWindow,
+    CreateWindowEx, DestroyWindow, ShowWindow, GetWindowText, SetWindowText,
     GetDC, ReleaseDC,
     GetWindowRect, MoveWindow,
 )
@@ -210,6 +210,12 @@ class Win(object):
         def move(self, left, top, width, height):
             top += (height - self.height) // 2
             MoveWindow(self.hwnd, left, top, width, self.height, 1)
+        
+        def get(self):
+            return GetWindowText(self.hwnd)
+        
+        def set(self, text):
+            SetWindowText(self.hwnd, text)
     
     class Button(object):
         def __init__(self, label, command=None, access=None):
@@ -310,7 +316,7 @@ class Win(object):
         (_, defext) = types[0]
         
         try:
-            GetOpenFileNameW(
+            (file, _, _) = GetOpenFileNameW(
                 Filter="".join(filter),
                 File=file,
                 Title=title,
@@ -320,9 +326,13 @@ class Win(object):
         except win32gui.error as err:
             if err.winerror:
                 raise
+            file = None
         
         if not self.visible:
             PostQuitMessage(0)
+            file = None
+        
+        return file
 
 def create_control(parent, wndclass, text=None,
     tabstop=False, style=0, id=None,
