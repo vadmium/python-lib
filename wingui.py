@@ -40,7 +40,14 @@ class Win(object):
                 WM_SIZE: self.on_size,
             }
             self.sections = sections
-            CreateDialogIndirect(None, (template,), 0, handlers)
+            
+            self.init_exc = None
+            try:
+                CreateDialogIndirect(None, (template,), 0, handlers)
+                if self.init_exc:
+                    raise self.init_exc
+            finally:
+                del self.init_exc
             
             height = 0
             for section in self.sections:
@@ -60,6 +67,7 @@ class Win(object):
             self.gui.visible.add(self)
         
         def on_init_dialog(self, hwnd, msg, wparam, lparam):
+            try:
                 self.hwnd = hwnd
                 
                 dc = GetDC(self.hwnd)
@@ -92,6 +100,9 @@ class Win(object):
                             text=label,
                         )
                         control.place_on(self)
+            
+            except BaseException as exc:
+                self.init_exc = exc
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
             self.gui.visible.remove(self)
