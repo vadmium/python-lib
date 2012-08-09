@@ -25,6 +25,9 @@ from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT, LVM_INSERTCOLUMNW)
 from win32gui_struct import PackLVCOLUMN
 from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
+from win32gui import GetOpenFileNameW
+from win32con import (OFN_HIDEREADONLY, OFN_EXPLORER, OFN_NOCHANGEDIR)
+import win32gui
 from win32con import ES_AUTOHSCROLL
 
 class Win(object):
@@ -129,7 +132,8 @@ class Win(object):
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
             self.gui.visible.remove(self)
-            PostQuitMessage(0)
+            if not self.gui.visible:
+                PostQuitMessage(0)
         
         def on_close(self, hwnd, msg, wparam, lparam):
             DestroyWindow(self.hwnd)
@@ -296,6 +300,29 @@ class Win(object):
                     width += 1  # Distribute rounding from the division
                 cell.move(left, top, cell_width, self.height)
                 left += cell_width
+    
+    def file_browse_open(self, *, title=None, types, file=None):
+        filter = list()
+        for (label, exts) in types:
+            exts = ";".join("*" + ext for ext in exts)
+            filter.append(
+                "{label} ({exts})\0" "{exts}\0".format_map(locals()))
+        (_, defext) = types[0]
+        
+        try:
+            GetOpenFileNameW(
+                Filter="".join(filter),
+                File=file,
+                Title=title,
+                Flags=OFN_HIDEREADONLY | OFN_EXPLORER | OFN_NOCHANGEDIR,
+                DefExt=defext[0],
+            )
+        except win32gui.error as err:
+            if err.winerror:
+                raise
+        
+        if not self.visible:
+            PostQuitMessage(0)
 
 def create_control(parent, wndclass, text=None,
     tabstop=False, style=0, id=None,
