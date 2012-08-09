@@ -60,38 +60,38 @@ class Win(object):
             self.gui.visible.add(self)
         
         def on_init_dialog(self, hwnd, msg, wparam, lparam):
-            self.hwnd = hwnd
-            
-            dc = GetDC(self.hwnd)
-            try:
-                prev = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT))
-                try:
-                    tm = GetTextMetrics(dc)
-                    self.x_unit = (tm["AveCharWidth"] + 1) / 4
-                    self.y_unit = tm["Height"] / 8
-                finally:
-                    SelectObject(dc, prev)
-            finally:
-                ReleaseDC(self.hwnd, dc)
-            
-            self.label_height = round(9 * self.y_unit)
-            
-            for section in self.sections:
-                access = section.pop("access", None)
-                label = label_key(section.pop("label"), access)
-                section["hwnd"] = create_control(self.hwnd, "BUTTON",
-                    style=BS_GROUPBOX, text=label,
-                )
+                self.hwnd = hwnd
                 
-                for field in section["fields"]:
-                    access = field.pop("access", None)
-                    label = label_key(field.pop("label"), access)
-                    control = field["field"]
-                    
-                    field["label"] = create_control(self.hwnd, "STATIC",
-                        text=label,
+                dc = GetDC(self.hwnd)
+                try:
+                    prev = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT))
+                    try:
+                        tm = GetTextMetrics(dc)
+                        self.x_unit = (tm["AveCharWidth"] + 1) / 4
+                        self.y_unit = tm["Height"] / 8
+                    finally:
+                        SelectObject(dc, prev)
+                finally:
+                    ReleaseDC(self.hwnd, dc)
+                
+                self.label_height = round(9 * self.y_unit)
+                
+                for section in self.sections:
+                    access = section.pop("access", None)
+                    label = label_key(section.pop("label"), access)
+                    section["hwnd"] = create_control(self.hwnd, "BUTTON",
+                        style=BS_GROUPBOX, text=label,
                     )
-                    control.place_on(self)
+                    
+                    for field in section["fields"]:
+                        access = field.pop("access", None)
+                        label = label_key(field.pop("label"), access)
+                        control = field["field"]
+                        
+                        field["label"] = create_control(self.hwnd, "STATIC",
+                            text=label,
+                        )
+                        control.place_on(self)
         
         def on_destroy(self, hwnd, msg, wparam, lparam):
             self.gui.visible.remove(self)
