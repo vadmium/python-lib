@@ -8,7 +8,7 @@ from win32gui import (
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
 from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
 from win32con import (WM_DESTROY, WM_CLOSE, WM_SIZE)
-from win32con import (WM_SETFONT, WM_INITDIALOG)
+from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
@@ -45,8 +45,12 @@ class Win(object):
                 WM_DESTROY: self.on_destroy,
                 WM_CLOSE: self.on_close,
                 WM_SIZE: self.on_size,
+                WM_COMMAND: self.on_command,
             }
             self.sections = sections
+            
+            self.commands = list()
+            self.commands.append(nop)  # Id. 0 seems already used
             
             self.init_exc = None
             try:
@@ -175,6 +179,10 @@ class Win(object):
                     0, group_top, cx, group_height, 1)
             
             return 1
+        
+        def on_command(self, hwnd, msg, wparam, lparam):
+            id = LOWORD(wparam)
+            self.commands[id]()
     
     class Entry(object):
         def __init__(self, value=None):
@@ -196,17 +204,25 @@ class Win(object):
             MoveWindow(self.hwnd, left, top, width, self.height, 1)
     
     class Button(object):
-        def __init__(self, label, access=None):
+        def __init__(self, label, command=None, access=None):
             self.label = label_key(label, access)
+            self.command = command
         
         def place_on(self, parent):
             self.parent = parent.hwnd
+            if self.command:
+                id = len(parent.commands)
+                parent.commands.append(self.command)
+            else:
+                id = None
+            
             self.width = round(50 * parent.x_unit)
             self.height = round(14 * parent.y_unit)
             self.hwnd = create_control(self.parent, "BUTTON",
                 style=BS_PUSHBUTTON,
                 tabstop=True,
                 text=self.label,
+                id=id,
             )
         
         def move(self, left, top, width, height):
@@ -277,7 +293,7 @@ class Win(object):
                 left += cell_width
 
 def create_control(parent, wndclass, text=None,
-    tabstop=False, style=0,
+    tabstop=False, style=0, id=None,
     x=0, y=0, width=0, height=0,
     ex_style=0,
 ):
@@ -289,10 +305,13 @@ def create_control(parent, wndclass, text=None,
         WS_CHILD | WS_VISIBLE | style,
         x, y, width, height,
         parent,
-        None,
+        id,
         None,
     None)
     SendMessage(hwnd, WM_SETFONT, GetStockObject(DEFAULT_GUI_FONT), 0 << 0)
     return hwnd
+
+def nop():
+    pass
 
 DEFAULT_GUI_FONT = 17
