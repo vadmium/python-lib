@@ -23,7 +23,7 @@ from commctrl import LVM_GETEXTENDEDLISTVIEWSTYLE
 from commctrl import LVM_SETEXTENDEDLISTVIEWSTYLE
 from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT, LVM_INSERTCOLUMNW)
 from win32gui_struct import PackLVCOLUMN
-from collections import Mapping
+from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
 from win32con import ES_AUTOHSCROLL
 
@@ -88,6 +88,11 @@ class Win(object):
                 self.fixed_height = 0
                 self.var_heights = 0
                 for section in self.sections:
+                    if not isinstance(section, Iterable):
+                        section.place_on(self)
+                        self.fixed_height += section.height
+                        continue
+                    
                     access = section.pop("access", None)
                     label = label_key(section.pop("label"), access)
                     section["hwnd"] = create_control(self.hwnd, "BUTTON",
@@ -132,6 +137,10 @@ class Win(object):
             y = 0
             spare_height = cy - self.fixed_height
             for section in self.sections:
+                if not isinstance(section, Iterable):
+                    section.move(0, y, cx, section.height)
+                    continue
+                
                 group_top = y
                 y += self.label_height
                 for field in section["fields"]:
