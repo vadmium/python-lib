@@ -55,15 +55,9 @@ class Win(object):
             finally:
                 del self.init_exc
             
-            height = 0
-            for section in self.sections:
-                height += self.label_height
-                for field in section["fields"]:
-                    height += field["field"].height
-                height += round(4 * self.y_unit)
-            
             (left, top, _, _) = GetWindowRect(self.hwnd)
             width = round(80 * self.x_unit) + round(160 * self.x_unit)
+            height = round(250 * self.y_unit)
             width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
             height += GetSystemMetrics(SM_CYCAPTION)
@@ -90,22 +84,29 @@ class Win(object):
                 
                 self.label_height = round(9 * self.y_unit)
                 
+                self.fixed_height = 0
                 for section in self.sections:
                     access = section.pop("access", None)
                     label = label_key(section.pop("label"), access)
                     section["hwnd"] = create_control(self.hwnd, "BUTTON",
                         style=BS_GROUPBOX, text=label,
                     )
+                    self.fixed_height += self.label_height
                     
                     for field in section["fields"]:
                         access = field.pop("access", None)
                         label = label_key(field.pop("label"), access)
-                        control = field["field"]
+                        target = field["field"]
                         
                         field["label"] = create_control(self.hwnd, "STATIC",
                             text=label,
                         )
-                        control.place_on(self)
+                        target.place_on(self)
+                        if target.height:
+                            self.fixed_height += max(self.label_height,
+                                target.height)
+                    
+                    self.fixed_height += round(4 * self.y_unit)
             
             except BaseException as exc:
                 self.init_exc = exc
@@ -127,9 +128,13 @@ class Win(object):
                 y += self.label_height
                 for field in section["fields"]:
                     target = field["field"]
-                    field_height = max(self.label_height, target.height)
+                    if target.height:
+                        field_height = max(self.label_height, target.height)
+                        label_y = y + (field_height - self.label_height) // 2
+                    else:
+                        field_height = cy - self.fixed_height
+                        label_y = y
                     
-                    label_y = y + (field_height - self.label_height) // 2
                     label_width = round(80 * self.x_unit)
                     MoveWindow(field["label"],
                         0, label_y, label_width, self.label_height, 1)
@@ -188,7 +193,7 @@ class Win(object):
         
         def place_on(self, parent):
             self.parent = parent.hwnd
-            self.height = round(5 * 8 * parent.y_unit)
+            self.height = 0
             InitCommonControls()
             self.hwnd = create_control(self.parent, WC_LISTVIEW,
                 style=LVS_SHOWSELALWAYS | LVS_REPORT,
