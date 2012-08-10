@@ -21,8 +21,10 @@ from win32api import (LOWORD, HIWORD)
 from commctrl import (LVS_SHOWSELALWAYS, LVS_REPORT, WC_LISTVIEW)
 from commctrl import LVM_GETEXTENDEDLISTVIEWSTYLE
 from commctrl import LVM_SETEXTENDEDLISTVIEWSTYLE
-from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT, LVM_INSERTCOLUMNW)
-from win32gui_struct import PackLVCOLUMN
+from commctrl import LVM_INSERTCOLUMNW
+from commctrl import (LVM_DELETEALLITEMS, LVM_INSERTITEMW, LVM_SETITEMTEXTW)
+from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT)
+from win32gui_struct import (PackLVCOLUMN, PackLVITEM)
 from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
 from win32gui import GetOpenFileNameW
@@ -271,9 +273,25 @@ class Win(object):
                 )
                 self.columns.append(obj)
                 SendMessage(self.hwnd, LVM_INSERTCOLUMNW, i, param)
+            
+            self.items = list()
         
         def move(self, left, top, width, height):
             MoveWindow(self.hwnd, left, top, width, height, 1)
+        
+        def clear(self):
+            SendMessage(self.hwnd, LVM_DELETEALLITEMS)
+            del self.items[:]
+        
+        def add(self, columns):
+            (param, obj) = PackLVITEM(item=len(self.items), text=columns[0])
+            self.items.append([obj])
+            item = SendMessage(self.hwnd, LVM_INSERTITEMW, 0, param)
+            
+            for (col, text) in enumerate(columns[1:], 1):
+                (param, obj) = PackLVITEM(text=text, subItem=col)
+                self.items[-1].append(obj)
+                SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
     
     class Layout(object):
         def __init__(self, cells):
