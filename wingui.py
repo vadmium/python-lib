@@ -328,9 +328,10 @@ class Win(object):
     def file_browse_open(self, *, title=None, types, file=None):
         filter = list()
         for (label, exts) in types:
-            exts = ";".join("*" + ext for ext in exts)
+            exts = ";".join("*." + ext for ext in exts)
             filter.append(
                 "{label} ({exts})\0" "{exts}\0".format_map(locals()))
+        filter.append("All (*)\0" "*\0")
         (_, defext) = types[0]
         
         try:
