@@ -309,7 +309,7 @@ class Win(object):
             self.sel_set.clear()
         
         def add(self, columns, selected=False):
-            item = len(self.items)
+            item = self.count()
             (param, obj) = PackLVITEM(
                 item=item,
                 text=columns[0],
@@ -365,6 +365,9 @@ class Win(object):
         
         def selection(self):
             return sorted(self.sel_set)
+        
+        def count(self):
+            return len(self.items)
     
     class Layout(object):
         def __init__(self, cells):
