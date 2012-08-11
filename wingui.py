@@ -50,7 +50,7 @@ class Win(object):
             PumpMessages()
     
     class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, title=None, *, sections):
+        def __init__(self, gui, parent=None, *, title=None, sections):
             self.gui = gui
             
             template = (title, (0, 0, 0, 0), WS_OVERLAPPEDWINDOW)
@@ -67,9 +67,14 @@ class Win(object):
             self.commands = dict()
             self.id = 1024
             
+            if parent:
+                parent = parent.hwnd
+            else:
+                parent = None
+            
             self.init_exc = None
             try:
-                CreateDialogIndirect(None, (template,), 0, handlers)
+                CreateDialogIndirect(None, (template,), parent, handlers)
                 if self.init_exc:
                     raise self.init_exc
             finally:
@@ -149,6 +154,9 @@ class Win(object):
                 PostQuitMessage(0)
         
         def on_close(self, hwnd, msg, wparam, lparam):
+            self.close()
+        
+        def close(self):
             DestroyWindow(self.hwnd)
         
         def on_size(self, hwnd, msg, wparam, lparam):
