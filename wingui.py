@@ -8,7 +8,7 @@ from win32gui import (
 from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
 from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
 from win32con import (WM_DESTROY, WM_CLOSE, WM_SIZE)
-from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND)
+from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND, WM_NOTIFY)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
@@ -31,6 +31,9 @@ from win32gui import GetOpenFileNameW
 from win32con import (OFN_HIDEREADONLY, OFN_EXPLORER, OFN_NOCHANGEDIR)
 import win32gui
 from commctrl import LVIS_SELECTED
+from win32gui import PyMakeBuffer
+from struct import Struct
+from commctrl import (LVN_ITEMCHANGED, LVIF_STATE)
 from win32con import ES_AUTOHSCROLL
 
 class Win(object):
@@ -52,6 +55,7 @@ class Win(object):
                 WM_CLOSE: self.on_close,
                 WM_SIZE: self.on_size,
                 WM_COMMAND: self.on_command,
+                WM_NOTIFY: self.on_notify,
             }
             self.sections = sections
             
@@ -97,6 +101,7 @@ class Win(object):
                 
                 self.fixed_height = 0
                 self.var_heights = 0
+                self.notify = dict()
                 for section in self.sections:
                     if not isinstance(section, Iterable):
                         section.place_on(self)
@@ -194,6 +199,16 @@ class Win(object):
             except LookupError:
                 return
             command()
+        
+        def on_notify(self, hwnd, msg, wparam, lparam):
+            (hwndFrom, _, code) = NMHDR.unpack(lparam)
+            try:
+                notify = self.notify[hwndFrom]
+            except LookupError:
+                pass
+            else:
+                notify(code, lparam)
+            return 1
     
     class Entry(object):
         def __init__(self, value=None):
@@ -249,8 +264,9 @@ class Win(object):
             MoveWindow(self.hwnd, left, top, self.width, self.height, 1)
     
     class List(object):
-        def __init__(self, headings):
+        def __init__(self, headings, selected=None):
             self.headings = headings
+            self.selected = selected
         
         def place_on(self, parent):
             self.parent = parent.hwnd
@@ -261,6 +277,7 @@ class Win(object):
                 tabstop=True,
                 ex_style=WS_EX_CLIENTEDGE,
             )
+            parent.notify[self.hwnd] = self.notify
             
             style = SendMessage(self.hwnd, LVM_GETEXTENDEDLISTVIEWSTYLE,
                 0, 0)
@@ -285,18 +302,37 @@ class Win(object):
             del self.items[:]
         
         def add(self, columns, selected=False):
+            item = len(self.items)
             (param, obj) = PackLVITEM(
-                item=len(self.items),
+                item=item,
                 text=columns[0],
                 stateMask=LVIS_SELECTED, state=LVIS_SELECTED * selected,
             )
             self.items.append([obj])
+            cb = self.selected
+            self.selected = None
             item = SendMessage(self.hwnd, LVM_INSERTITEMW, 0, param)
+            self.selected = cb
             
             for (col, text) in enumerate(columns[1:], 1):
                 (param, obj) = PackLVITEM(text=text, subItem=col)
                 self.items[-1].append(obj)
                 SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
+            
+            if selected and self.selected:
+                self.selected(item, True)
+        
+        def notify(self, code, pnmh):
+            if code != LVN_ITEMCHANGED or self.selected is None:
+                return
+            (_, _, _, item, _, new, old, changed, _, _, _) = (
+                NM_LISTVIEW.unpack(pnmh))
+            if not changed & LVIF_STATE:
+                return
+            old &= LVIS_SELECTED
+            new &= LVIS_SELECTED
+            if old != new:
+                self.selected(item, bool(new))
     
     class Layout(object):
         def __init__(self, cells):
@@ -380,4 +416,15 @@ def create_control(parent, wndclass, text=None,
 def nop():
     pass
 
+class WinStruct(Struct):
+    def unpack(self, p):
+        return Struct.unpack(self, PyMakeBuffer(self.size, p))
+
 DEFAULT_GUI_FONT = 17
+
+# Python 3.2.3's Struct.format is actually a byte string
+
+# Using signed integer for code because commctrl.LVM_ITEMCHANGED is negative
+NMHDR = WinStruct(b"P I i")
+
+NM_LISTVIEW = WinStruct(NMHDR.format + b"i i I I I 2l P")
