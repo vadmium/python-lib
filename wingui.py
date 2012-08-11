@@ -31,8 +31,10 @@ from win32gui_struct import (
 )
 from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
-from win32gui import GetOpenFileNameW
-from win32con import (OFN_HIDEREADONLY, OFN_EXPLORER, OFN_NOCHANGEDIR)
+from win32gui import (GetOpenFileNameW, GetSaveFileNameW)
+from win32con import (
+    OFN_HIDEREADONLY, OFN_EXPLORER, OFN_OVERWRITEPROMPT, OFN_NOCHANGEDIR,
+)
 import win32gui
 from commctrl import LVIS_SELECTED
 from win32api import MAKELONG
@@ -409,7 +411,7 @@ class Win(object):
                 cell.move(left, top, cell_width, self.height)
                 left += cell_width
     
-    def file_browse_open(self, *, title=None, types, file=None):
+    def file_browse(self, mode, *, title=None, types, file=None):
         filter = list()
         for (label, exts) in types:
             exts = ";".join("*." + ext for ext in exts)
@@ -418,12 +420,14 @@ class Win(object):
         filter.append("All (*)\0" "*\0")
         (_, defext) = types[0]
         
+        mode = dict(open=GetOpenFileNameW, save=GetSaveFileNameW)[mode]
         try:
-            (file, _, _) = GetOpenFileNameW(
+            (file, _, _) = mode(
                 Filter="".join(filter),
                 File=file,
                 Title=title,
-                Flags=OFN_HIDEREADONLY | OFN_EXPLORER | OFN_NOCHANGEDIR,
+                Flags=OFN_HIDEREADONLY | OFN_EXPLORER | OFN_OVERWRITEPROMPT |
+                    OFN_NOCHANGEDIR,
                 DefExt=defext[0],
             )
         except win32gui.error as err:
