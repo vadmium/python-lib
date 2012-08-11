@@ -5,7 +5,9 @@ from win32gui import (
     GetDC, ReleaseDC,
     GetWindowRect, MoveWindow,
 )
-from win32con import (WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP)
+from win32con import (
+    WS_VISIBLE, WS_OVERLAPPEDWINDOW, WS_CHILD, WS_TABSTOP, WS_DISABLED,
+)
 from win32con import (WS_EX_NOPARENTNOTIFY, WS_EX_CLIENTEDGE)
 from win32con import (WM_DESTROY, WM_CLOSE, WM_SIZE)
 from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND, WM_NOTIFY)
@@ -266,8 +268,10 @@ class Win(object):
             
             self.width = round(50 * parent.x_unit)
             self.height = round(14 * parent.y_unit)
+            
+            disabled = self.command is None
             self.hwnd = create_control(self.parent, "BUTTON",
-                style=BS_PUSHBUTTON,
+                style=BS_PUSHBUTTON | WS_DISABLED * disabled,
                 tabstop=True,
                 text=self.label,
                 id=id,
