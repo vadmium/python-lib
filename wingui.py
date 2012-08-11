@@ -19,12 +19,15 @@ from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import (BS_GROUPBOX, BS_PUSHBUTTON)
 from win32api import (LOWORD, HIWORD)
 from commctrl import (LVS_SHOWSELALWAYS, LVS_REPORT, WC_LISTVIEW)
-from commctrl import LVM_GETEXTENDEDLISTVIEWSTYLE
-from commctrl import LVM_SETEXTENDEDLISTVIEWSTYLE
-from commctrl import LVM_INSERTCOLUMNW
-from commctrl import (LVM_DELETEALLITEMS, LVM_INSERTITEMW, LVM_SETITEMTEXTW)
+from commctrl import (
+    LVM_GETEXTENDEDLISTVIEWSTYLE, LVM_SETEXTENDEDLISTVIEWSTYLE,
+    LVM_INSERTCOLUMNW,
+    LVM_DELETEALLITEMS, LVM_INSERTITEMW, LVM_SETITEMTEXTW, LVM_GETITEMTEXTW,
+)
 from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT)
-from win32gui_struct import (PackLVCOLUMN, PackLVITEM)
+from win32gui_struct import (
+    PackLVCOLUMN, PackLVITEM, EmptyLVITEM, UnpackLVITEM,
+)
 from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
 from win32gui import GetOpenFileNameW
@@ -33,7 +36,7 @@ import win32gui
 from commctrl import LVIS_SELECTED
 from win32gui import PyMakeBuffer
 from struct import Struct
-from commctrl import (LVN_ITEMCHANGED, LVIF_STATE)
+from commctrl import (LVN_ITEMCHANGED, LVIF_STATE, LVIF_TEXT)
 from win32con import ES_AUTOHSCROLL
 
 class Win(object):
@@ -266,6 +269,7 @@ class Win(object):
     class List(object):
         def __init__(self, headings, selected=None):
             self.headings = headings
+            self.sel_set = set()
             self.selected = selected
         
         def place_on(self, parent):
@@ -300,6 +304,7 @@ class Win(object):
         def clear(self):
             SendMessage(self.hwnd, LVM_DELETEALLITEMS)
             del self.items[:]
+            self.sel_set.clear()
         
         def add(self, columns, selected=False):
             item = len(self.items)
@@ -320,10 +325,11 @@ class Win(object):
                 SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
             
             if selected and self.selected:
+                self.sel_set.add(item)
                 self.selected(item, True)
         
         def notify(self, code, pnmh):
-            if code != LVN_ITEMCHANGED or self.selected is None:
+            if code != LVN_ITEMCHANGED:
                 return
             (_, _, _, item, _, new, old, changed, _, _, _) = (
                 NM_LISTVIEW.unpack(pnmh))
@@ -331,8 +337,28 @@ class Win(object):
                 return
             old &= LVIS_SELECTED
             new &= LVIS_SELECTED
-            if old != new:
+            if old == new:
+                return
+            
+            if new:
+                self.sel_set.add(item)
+            else:
+                self.sel_set.remove(item)
+            
+            if self.selected:
                 self.selected(item, bool(new))
+        
+        def get(self, item):
+            values = list()
+            for col in range(len(self.headings)):
+                (lvitem, obj) = EmptyLVITEM(0, col, LVIF_TEXT)
+                SendMessage(self.hwnd, LVM_GETITEMTEXTW, item, lvitem)
+                (_, _, _, _, text, _, _, _) = UnpackLVITEM(lvitem)
+                values.append(text)
+            return values
+        
+        def selection(self):
+            return sorted(self.sel_set)
     
     class Layout(object):
         def __init__(self, cells):
