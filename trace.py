@@ -2,12 +2,12 @@
 from __future__ import print_function
 
 from sys import stderr
-from lib import Function
+from lib import WrapperFunction
 from lib import nop
 
-class traced(Function):
+class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
-        self.func = func
+        WrapperFunction.__init__(self, func)
         if name is None:
             try:
                 self.name = func.__name__
@@ -33,7 +33,7 @@ class traced(Function):
         stderr.flush()
         indent += 1
         try:
-            ret = self.func(*args, **kw)
+            ret = self.__wrapped__(*args, **kw)
         except BaseException as exc:
             self.print_result("raise", exc)
             raise

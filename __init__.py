@@ -6,8 +6,8 @@ from sys import argv
 import os
 from types import MethodType
 from functools import partial
-from functools import update_wrapper
 from collections import namedtuple
+from collections import Set
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -33,14 +33,22 @@ class Function(object):
             return self
         return MethodType(self, obj)
 
-class deco_factory(Function):
+class WrapperFunction(Function):
+    from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
+    ASSIGNMENTS = set(WRAPPER_ASSIGNMENTS)
+    ASSIGNMENTS.update("__defaults__, __code__".split(", "))
+    def __init__(self, wrapped, assigned=ASSIGNMENTS, *args, **kw):
+        self.update_wrapper(wrapped, assigned, *args, **kw)
+        try:
+            self.__kwdefaults__ = wrapped.__kwdefaults__
+        except AttributeError:
+            pass
+
+class deco_factory(WrapperFunction):
     """Decorator to create a decorator factory given a function taking the
     factory input and the object to be decorated"""
-    def __init__(self, d):
-        update_wrapper(self, d)
-        self.d = d
     def __call__(self, *args, **kw):
-        return partial(self.d, *args, **kw)
+        return partial(self.__wrapped__, *args, **kw)
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
@@ -102,23 +110,32 @@ def run_main(module):
     if module != "__main__":
         return
     main = modules[module].main
-    try:
-        alias_opts = main.alias_opts
-    except AttributeError:
-        alias_opts = dict()
-    try:
-        arg_types = main.arg_types
-    except AttributeError:
-        arg_types = dict()
+    alias_opts = getattr(main, "alias_opts", dict())
     
-    try:
-        ann = main.__annotations__
-    except AttributeError:
-        pass
+    defaults = getattr(main, "__defaults__", None)
+    if defaults:
+        args = main.__code__.co_varnames[:main.__code__.co_argcount]
+        args = args[-len(defaults):]
+        defaults = ((args[i], value) for (i, value) in enumerate(defaults))
+        defaults = dict(defaults)
     else:
-        arg_types.update(ann)
+        defaults = dict()
+    defaults.update(getattr(main, "__kwdefaults__", None) or dict())
     
-    help_opts = {"help", "_help"}.difference(arg_types.keys())
+    # First guess some attributes from any default values
+    arg_types = dict()
+    seq_args = set()
+    for (opt, value) in defaults.items():
+        if value is False:
+            arg_types[opt] = True
+        if isinstance(value, (tuple, list, Set)):
+            seq_args.add(opt)
+    
+    arg_types.update(getattr(main, "arg_types", dict()))
+    arg_types.update(getattr(main, "__annotations__", dict()))
+    seq_args.update(getattr(main, "seq_args", ()))
+    
+    help_opts = {"help", "_help"}.difference(arg_types.keys()) - seq_args
     
     args = list()
     opts = dict()
@@ -140,7 +157,10 @@ def run_main(module):
             
             convert = arg_types.get(opt)
             if convert is True:
-                arg = convert
+                if opt in seq_args:
+                    opts[opt] = opts.get(opt, 0) + 1
+                else:
+                    opts[opt] = convert
             else:
                 try:
                     arg = next(cmd_args)
@@ -152,7 +172,10 @@ def run_main(module):
                         raise
                 if opt in arg_types:
                     arg = convert(arg)
-            opts[opt] = arg
+                if opt in seq_args:
+                    opts.setdefault(opt, list()).append(arg)
+                else:
+                    opts[opt] = arg
         else:
             args.append(arg)
     
@@ -213,7 +236,7 @@ def url_port(url, scheme, ports):
     if not parsed.hostname:
         parsed = urlsplit("//" + url, scheme=scheme)
     if not parsed.hostname:
-        raise ValueError("No host name specified: {0}".format(url))
+        raise ValueError("No host name specified: {0!r}".format(url))
     
     try:
         def_port = ports[parsed.scheme]
