@@ -135,7 +135,7 @@ def run_main(module):
     arg_types.update(getattr(main, "__annotations__", dict()))
     seq_args.update(getattr(main, "seq_args", ()))
     
-    help_opts = {"help", "_help"}.difference(arg_types.keys()) - seq_args
+    auto_help = "help" not in arg_types and "help" not in seq_args
     
     args = list()
     opts = dict()
@@ -148,34 +148,58 @@ def run_main(module):
         if arg == "--":
             args.extend(cmd_args)
             break
-        if arg.startswith("-"):
-            opt = arg[len("-"):]
+        
+        try:
+            opt = strip(arg, "-")
+        except ValueError:
+            opt = None
+        
+        if opt:
+            # Allow options to be preceded by two dashes
             try:
-                opt = alias_opts[opt]
-            except LookupError:
-                opt = opt.replace("-", "_")
+                opt = strip(opt, "-")
+            except ValueError:
+                pass
+            
+            # Allow argument to be separated by equals sign
+            try:
+                (opt, arg) = opt.split("=")
+            except ValueError:
+                arg = None
+            
+            opt = opt.replace("-", "_")
+            opt = alias_opts.get(opt, opt)
             
             convert = arg_types.get(opt)
             if convert is True:
                 if opt in seq_args:
-                    opts[opt] = opts.get(opt, 0) + 1
+                    if arg is None:
+                        arg = 1
+                    opts[opt] = opts.get(opt, 0) + int(arg)
                 else:
+                    if arg is not None:
+                        raise SystemExit("Option {opt!r} takes no argument".
+                            format_map(locals()))
                     opts[opt] = convert
+            
             else:
-                try:
-                    arg = next(cmd_args)
-                except StopIteration:
-                    if opt in help_opts:
-                        help(main)
-                        return
-                    else:
-                        raise
+                if arg is None:
+                    try:
+                        arg = next(cmd_args)
+                    except StopIteration:
+                        if auto_help and opt == "help":
+                            help(main)
+                            return
+                        raise SystemExit("Option {opt!r} requires an "
+                            "argument".format_map(locals()))
+                
                 if opt in arg_types:
                     arg = convert(arg)
                 if opt in seq_args:
                     opts.setdefault(opt, list()).append(arg)
                 else:
                     opts[opt] = arg
+        
         else:
             args.append(arg)
     
@@ -189,11 +213,11 @@ def run_main(module):
     
     try:
         main(*args, **opts)
-    except TypeError:
-        if help_opts.isdisjoint(opts.keys()):
-            raise
-        else:
+    except TypeError as err:
+        if auto_help and "help" in opts:
             help(main)
+        else:
+            raise SystemExit(err)
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
