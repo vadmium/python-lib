@@ -8,6 +8,7 @@ from types import MethodType
 from functools import partial
 from collections import namedtuple
 from collections import Set
+from inspect import getcallargs
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -212,12 +213,20 @@ def run_main(module):
             args[i] = convert(args[i])
     
     try:
+        getcallargs(main, *args, **opts)
+    except TypeError as err:
+        if auto_help and "help" in opts:
+            help(main)
+            raise SystemExit()
+        raise SystemExit(err)
+    
+    try:
         main(*args, **opts)
     except TypeError as err:
         if auto_help and "help" in opts:
             help(main)
-        else:
-            raise SystemExit(err)
+            raise SystemExit()
+        raise
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
