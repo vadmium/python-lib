@@ -14,7 +14,8 @@ class traced(WrapperFunction):
             except AttributeError:
                 self.name = repr(func)
             else:
-                if "from" not in abbrev and func.__module__ is not None:
+                if ("import" not in abbrev and
+                getattr(func, "__module__", None) is not None):
                     self.name = "{0}.{1}".format(func.__module__, self.name)
         else:
             self.name = name
