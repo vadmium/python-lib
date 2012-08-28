@@ -117,7 +117,40 @@ class Ttk(object):
             
             if self.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
-                self.widget.bind_select(self.selected)
+                self.widget.bind_select(self.select)
+        
+        def clear(self):
+            return self.widget.tree.delete(*self.widget.tree.get_children())
+        
+        def add(self, columns, selected=False):
+            item = self.widget.add(values=columns)
+            if selected:
+                # Empty selection returns empty string?!
+                selection = tuple(self.widget.tree.selection())
+                self.widget.tree.selection_set(selection + (item,))
+        
+        def remove(self, item):
+            focus = self.widget.tree.focus()
+            if focus == item:
+                new = self.widget.tree.next(focus)
+                if not new:
+                    new = self.widget.tree.prev(focus)
+            else:
+                new = ""
+            
+            self.widget.tree.delete(item)
+            
+            if new:
+                self.widget.tree.focus(new)
+        
+        def get(self, item):
+            return self.widget.tree.item(item, option="values")
+        
+        def selection(self):
+            return self.widget.tree.selection()
+        
+        def select(self, event):
+            self.selected()
     
     class Layout(object):
         def __init__(self, cells):
