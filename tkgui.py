@@ -1,6 +1,7 @@
 from tkinter import Tk
 from tkinter.ttk import (Button, Entry, Frame, LabelFrame)
 import tkinter
+from tkinter.filedialog import (askopenfilename, asksaveasfilename)
 from lib.tk import ScrolledTree
 from tkinter.font import nametofont
 from lib.tk import font_size
@@ -82,6 +83,13 @@ class Ttk(object):
             self.widget = Entry(master)
             if self.value:
                 self.widget.insert(0, self.value)
+        
+        def get(self):
+            return self.widget.get()
+        
+        def set(self, text):
+            self.widget.delete(0, tkinter.END)
+            self.widget.insert(0, text)
     
     class Button(object):
         def __init__(self, label, command=None, access=None):
@@ -121,6 +129,24 @@ class Ttk(object):
             for (col, cell) in enumerate(self.cells):
                 cell.place_on(self.widget)
                 cell.widget.grid(row=0, column=col, sticky=tkinter.EW)
+    
+    def file_browse(self, mode, *, title=None, types, file=None):
+        filetypes = list()
+        for (label, exts) in types:
+            filetypes.append((label, tuple("." + ext for ext in exts)))
+        filetypes.append(("All", ("*",)))
+        
+        mode = dict(open=askopenfilename, save=asksaveasfilename)[mode]
+        kw = dict()
+        if title is not None:
+            kw.update(title=title)
+        if file is not None:
+            kw.update(initialfile=file)
+        #~ parent=self.window
+        file = mode(filetypes=filetypes, **kw)
+        if not file:
+            return None
+        return file
 
 def convert_label(label, key=None):
     label = label_key(label, key)
