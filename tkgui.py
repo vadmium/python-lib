@@ -7,6 +7,7 @@ from lib.tk import font_size
 from lib.tk import Form
 from guis import InnerClass
 from guis import label_key
+from collections import (Mapping, Iterable)
 
 class Ttk(object):
     def __init__(self):
@@ -28,6 +29,11 @@ class Ttk(object):
             padding = font_size(font["size"] / 2)
             
             for section in sections:
+                if not isinstance(section, Iterable):
+                    section.place_on(form.master)
+                    section.widget.grid(columnspan=4)
+                    continue
+                
                 access = section.get("access")
                 label = convert_label(section["label"], access)
                 group = LabelFrame(form.master, **label)
@@ -39,13 +45,27 @@ class Ttk(object):
                 )
                 
                 for field in section["fields"]:
-                    target = field["field"]
-                    #~ #ca_entry.focus_set()
-                    kw = convert_label(field["label"], field.get("access"))
-                    if getattr(target, "multiline", False):
-                        kw["multiline"] = True
+                    if isinstance(field, Mapping):
+                        target = field["field"]
+                    else:
+                        target = field
                     target.place_on(form.master)
-                    form.add_field(target.widget, **kw)
+                    multiline = getattr(target, "multiline", False)
+                    
+                    if isinstance(field, Mapping):
+                        kw = convert_label(field["label"], field.get("access"))
+                        if multiline:
+                            kw["multiline"] = True
+                        form.add_field(target.widget, **kw)
+                    else:
+                        sticky = [tkinter.EW]
+                        if multiline:
+                            sticky.append(tkinter.NS)
+                        target.widget.grid(column=form.column, columnspan=2,
+                            sticky=sticky)
+                        if multiline:
+                            row = target.widget.grid_info()["row"]
+                            form.master.rowconfigure(row, weight=1)
                 
                 (_, rows) = form.master.size()
                 group.grid(rowspan=rows + 1 - group_row)
@@ -64,11 +84,17 @@ class Ttk(object):
                 self.widget.insert(0, self.value)
     
     class Button(object):
-        def __init__(self, label, access=None):
-            self.label = convert_label(label, access)
+        def __init__(self, label, command=None, access=None):
+            self.kw = dict()
+            self.disabled = command is None
+            if not self.disabled:
+                self.kw.update(command=command)
+            self.kw.update(convert_label(label, access))
         
         def place_on(self, master):
-            self.widget = Button(master, **self.label)
+            self.widget = Button(master, **self.kw)
+            if self.disabled:
+                self.widget.state(("disabled",))
     
     class List(object):
         multiline = True
