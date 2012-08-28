@@ -73,12 +73,17 @@ class Ttk(object):
     class List(object):
         multiline = True
         
-        def __init__(self, headings):
+        def __init__(self, headings, selected=None):
             self.headings = headings
+            self.selected = selected
         
         def place_on(self, master):
             self.widget = ScrolledTree(master, tree=False,
                 columns=self.headings)
+            
+            if self.selected:
+                #~ self.select_binding = self.evc_list.bind_select(self.select)
+                self.widget.bind_select(self.selected)
     
     class Layout(object):
         def __init__(self, cells):

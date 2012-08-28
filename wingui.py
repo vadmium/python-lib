@@ -340,9 +340,10 @@ class Win(object):
                 self.items[-1].append(obj)
                 SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
             
-            if selected and self.selected:
+            if selected:
                 self.sel_set.add(item)
-                self.selected(item, True)
+                if self.selected:
+                    self.selected()
         
         def remove(self, item):
             self.items.pop(item)
@@ -366,7 +367,7 @@ class Win(object):
                 self.sel_set.remove(item)
             
             if self.selected:
-                self.selected(item, bool(new))
+                self.selected()
         
         def get(self, item):
             values = list()
