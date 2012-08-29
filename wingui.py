@@ -416,7 +416,8 @@ class Win(object):
                 cell.move(left, top, cell_width, self.height)
                 left += cell_width
     
-    def file_browse(self, mode, *, title=None, types, file=None):
+    def file_browse(self, mode, parent=None, *,
+    title=None, types, file=None):
         filter = list()
         for (label, exts) in types:
             exts = ";".join("*." + ext for ext in exts)

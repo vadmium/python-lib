@@ -83,6 +83,9 @@ class Ttk(object):
                 form.master.columnconfigure(form.column - 1, minsize=side)
                 form.master.columnconfigure(form.column + 2, minsize=side)
                 form.master.rowconfigure(rows, minsize=side)
+        
+        def close(self):
+            self.window.destroy()
     
     class Entry(object):
         expand = True
@@ -196,7 +199,8 @@ class Ttk(object):
                     self.widget.columnconfigure(col, weight=1)
             return focussed
     
-    def file_browse(self, mode, *, title=None, types, file=None):
+    def file_browse(self, mode, parent=None, *,
+    title=None, types, file=None):
         filetypes = list()
         for (label, exts) in types:
             filetypes.append((label, tuple("." + ext for ext in exts)))
@@ -208,7 +212,8 @@ class Ttk(object):
             kw.update(title=title)
         if file is not None:
             kw.update(initialfile=file)
-        #~ parent=self.window
+        if parent is not None:
+            kw.update(parent=parent.window)
         file = mode(filetypes=filetypes, **kw)
         if not file:
             return None
