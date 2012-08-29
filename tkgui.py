@@ -29,9 +29,11 @@ class Ttk(object):
             side = font_size(font["size"])
             padding = font_size(font["size"] / 2)
             
+            focussed = False
             for section in sections:
                 if not isinstance(section, Iterable):
-                    section.place_on(form.master)
+                    focussed |= bool(section.place_on(form.master,
+                        not focussed))
                     section.widget.grid(columnspan=4)
                     continue
                 
@@ -50,7 +52,8 @@ class Ttk(object):
                         target = field["field"]
                     else:
                         target = field
-                    target.place_on(form.master)
+                    focussed |= bool(target.place_on(form.master,
+                        not focussed))
                     multiline = getattr(target, "multiline", False)
                     
                     if isinstance(field, Mapping):
@@ -76,13 +79,18 @@ class Ttk(object):
                 form.master.rowconfigure(rows, minsize=side)
     
     class Entry(object):
+        expand = True
+        
         def __init__(self, value=None):
             self.value = value
         
-        def place_on(self, master):
+        def place_on(self, master, focus=False):
             self.widget = Entry(master)
             if self.value:
                 self.widget.insert(0, self.value)
+            if focus:
+                self.widget.focus_set()
+                return True
         
         def get(self):
             return self.widget.get()
@@ -99,10 +107,13 @@ class Ttk(object):
                 self.kw.update(command=command)
             self.kw.update(convert_label(label, access))
         
-        def place_on(self, master):
+        def place_on(self, master, focus=False):
             self.widget = Button(master, **self.kw)
             if self.disabled:
                 self.widget.state(("disabled",))
+            if focus:
+                self.focus_set()
+                return True
     
     class List(object):
         multiline = True
@@ -111,13 +122,17 @@ class Ttk(object):
             self.headings = headings
             self.selected = selected
         
-        def place_on(self, master):
+        def place_on(self, master, focus=False):
             self.widget = ScrolledTree(master, tree=False,
                 columns=self.headings)
             
             if self.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
                 self.widget.bind_select(self.select)
+            
+            if focus:
+                self.widget.tree.focus_set()
+                return True
         
         def clear(self):
             return self.widget.tree.delete(*self.widget.tree.get_children())
@@ -156,12 +171,21 @@ class Ttk(object):
         def __init__(self, cells):
             self.cells = cells
         
-        def place_on(self, master):
+        def place_on(self, master, focus):
+            focussed = False
             self.widget = Frame(master)
-            self.widget.columnconfigure(0, weight=1)
+            all_expand = not any(getattr(cell, "expand", False)
+                for cell in self.cells)
             for (col, cell) in enumerate(self.cells):
-                cell.place_on(self.widget)
-                cell.widget.grid(row=0, column=col, sticky=tkinter.EW)
+                focussed |= bool(cell.place_on(self.widget,
+                    not focussed and focus))
+                sticky = list()
+                if getattr(cell, "expand", False):
+                    sticky.append(tkinter.EW)
+                cell.widget.grid(row=0, column=col, sticky=sticky)
+                if all_expand or getattr(cell, "expand", False):
+                    self.widget.columnconfigure(col, weight=1)
+            return focussed
     
     def file_browse(self, mode, *, title=None, types, file=None):
         filetypes = list()
