@@ -2,6 +2,7 @@ from tkinter import Tk
 from tkinter.ttk import (Button, Entry, Frame, LabelFrame)
 import tkinter
 from tkinter.filedialog import (askopenfilename, asksaveasfilename)
+from tkinter import Toplevel
 from lib.tk import ScrolledTree
 from tkinter.font import nametofont
 from lib.tk import font_size
@@ -18,11 +19,16 @@ class Ttk(object):
         self.root.mainloop()
     
     class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, title=None, *, sections):
-            if title is not None:
-                gui.root.title(title)
+        def __init__(self, gui, parent=None, *, title=None, sections):
+            if parent:
+                self.window = Toplevel(parent.window)
+            else:
+                self.window = gui.root
             
-            form = Form(gui.root, column=1)
+            if title is not None:
+                self.window.title(title)
+            
+            form = Form(self.window, column=1)
             
             font = nametofont("TkDefaultFont")
             top = font.metrics("linespace")
@@ -166,6 +172,9 @@ class Ttk(object):
         
         def select(self, event):
             self.selected()
+        
+        def __iter__(self):
+            return iter(self.widget.tree.get_children())
     
     class Layout(object):
         def __init__(self, cells):
@@ -207,6 +216,8 @@ class Ttk(object):
 
 def convert_label(label, key=None):
     label = label_key(label, key)
+    if label is None:
+        return dict()
     (head, sep, tail) = label.partition("&")
     if sep:
         return dict(text=head + tail, underline=len(head))
