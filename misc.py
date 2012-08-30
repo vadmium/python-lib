@@ -138,6 +138,12 @@ def url_port(url, scheme, ports):
     return dict(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
+class Context(object):
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc):
+        return False
+
 class CloseAll(closing):
     def __init__(self):
         closing.__init__(self, self)
