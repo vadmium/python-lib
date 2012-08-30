@@ -297,12 +297,15 @@ def fields(f, *args, **kw):
     f.__dict__.update(*args, **kw)
     return f
 
-class Cleanup:
-    def __init__(self):
-        self.exits = []
-    
+class Context(object):
     def __enter__(self):
         return self
+    def __exit__(self, *exc):
+        return False
+
+class Cleanup(Context):
+    def __init__(self):
+        self.exits = []
     
     def __exit__(self, *exc):
         while self.exits:
