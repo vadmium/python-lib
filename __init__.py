@@ -36,10 +36,19 @@ class Function(object):
 
 class WrapperFunction(Function):
     from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
-    ASSIGNMENTS = set(WRAPPER_ASSIGNMENTS)
-    ASSIGNMENTS.update("__defaults__, __code__".split(", "))
-    def __init__(self, wrapped, assigned=ASSIGNMENTS, *args, **kw):
+    def __init__(self, wrapped, assigned=WRAPPER_ASSIGNMENTS, *args, **kw):
         self.update_wrapper(wrapped, assigned, *args, **kw)
+        if not hasattr(self, "__wrapped__"):  # Python 2 does not add this
+            self.__wrapped__ = wrapped
+        
+        # Python 2 cannot assign these unless they are guaranteed to exist
+        for name in {"__defaults__", "__code__"}.difference(assigned):
+            try:
+                value = getattr(wrapped, name)
+            except AttributeError:
+                continue
+            setattr(self, name, value)
+        
         try:
             self.__kwdefaults__ = wrapped.__kwdefaults__
         except AttributeError:
