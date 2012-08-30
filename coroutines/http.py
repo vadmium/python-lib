@@ -136,7 +136,8 @@ class HTTPConnection(object):
             last = te[-1]
         except LookupError:
             yield parser.after_eol()
-            raise StopIteration(IdentityResponse(self.sock, parser, msg))
+            raise StopIteration(IdentityResponse(status, reason, msg,
+                self.sock, parser))
         
         # TODO: better parsing: eliminate null elements; check for "identity"
         (*split, last) = last.rsplit(",", 1)
@@ -156,12 +157,19 @@ class HTTPConnection(object):
         for i in te:
             msg["Transfer-Encoding"] = i
         
-        raise StopIteration(ChunkedResponse(self.sock, parser, msg))
+        raise StopIteration(ChunkedResponse(status, reason, msg, self.sock,
+            parser))
 
-class IdentityResponse(object):
-    def __init__(self, sock, parser, msg):
-        self.sock = sock
+class HTTPResponse(object):
+    def __init__(self, status, reason, msg):
+        self.status = int(status)
+        self.reason = reason.decode("ISO-8859-1")
         self.msg = msg
+
+class IdentityResponse(HTTPResponse):
+    def __init__(self, status, reason, msg, sock, parser):
+        HTTPResponse.__init__(self, status, reason, msg)
+        self.sock = sock
         (self.size,) = self.msg.get_all("Content-Length", [])
         self.size = int(self.size)
         if self.size:
@@ -178,10 +186,10 @@ class IdentityResponse(object):
         self.size -= len(data)
         raise StopIteration(data)
 
-class ChunkedResponse(object):
-    def __init__(self, sock, parser, msg):
+class ChunkedResponse(HTTPResponse):
+    def __init__(self, status, reason, msg, sock, parser):
+        HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        self.msg = msg
         self.chunks = self.Chunks(parser)
         self.size = None
     
