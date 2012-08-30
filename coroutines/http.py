@@ -1,3 +1,7 @@
+"""
+API modelled around the built-in "http.client" package
+"""
+
 # Reference: https://tools.ietf.org/html/rfc2616
 
 from http.client import (
@@ -5,27 +9,27 @@ from http.client import (
 from lib import event
 import email.parser
 
-def get(sock, hostname, path):
-    yield sock.send(b"GET ")
-    for c in path.encode("UTF-8"):
-        if c <= ord(b" "):
-            yield sock.send(b"%{:02X}".format(c))
-        else:
-            yield sock.send(bytes((c,)))
-    
-    yield sock.send(b" HTTP/1.1\r\n"
-        
-        # Mandatory for 1.1:
-        b"Host: "
-    )
-    yield sock.send(hostname.encode())
-    yield sock.send(b"\r\n"
-        b"\r\n"
-    )
-
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
+    
+    def get(self, hostname, path):
+        yield self.sock.send(b"GET ")
+        for c in path.encode("UTF-8"):
+            if c <= ord(b" "):
+                yield self.sock.send(b"%{:02X}".format(c))
+            else:
+                yield self.sock.send(bytes((c,)))
+        
+        yield self.sock.send(b" HTTP/1.1\r\n"
+            
+            # Mandatory for 1.1:
+            b"Host: "
+        )
+        yield self.sock.send(hostname.encode())
+        yield self.sock.send(b"\r\n"
+            b"\r\n"
+        )
     
     def getresponse(self):
         parser = Parser(self.sock)
