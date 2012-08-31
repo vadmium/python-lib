@@ -132,17 +132,6 @@ class Thread(object):
     def __repr__(self):
         return "<{0} {1:#x}>".format(type(self).__name__, id(self))
 
-class Group(object):
-    def __init__(self):
-        self.set = set()
-    
-    def add(self, routine):
-        self.set.add(routine)
-    
-    def close(self):
-        while self.set:
-            self.set.pop().close()
-
 class Event(object):
     """Base class that an event generator can yield to wait for events"""
     def __init__(self):
