@@ -2,7 +2,7 @@
 # http://www.python.org/dev/peps/pep-0380
 
 # Similar generator wrapper implementation:
-# http://mail.python.org/pipermail/python-dev/2010-July/102320.html
+# https://mail.python.org/pipermail/python-dev/2010-July/102320.html
 
 # "Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1
 # apparently only compiles with Python 2.
@@ -11,31 +11,31 @@
 import weakref
 from lib import weakmethod
 from sys import exc_info
-from lib import Record
 from sys import (displayhook, excepthook)
+from collections import deque
 
-class Routine(object):
-    """
-    Runs an event-driven co-routine implemented as a generator. The generator
-    can yield:
-    + Event objects, which are waited on before continuing the co-routine
-    + Generator sub-co-routines, which are executed to completion before the
-    parent co-routine is continued
+class Thread(object):
+    """Schedules an event-driven generator
+    
+    The generator can yield:
+    * Event objects, which are waited on before continuing the coroutine
+    * Generator sub-coroutines, which are executed to completion before the
+    parent coroutine is continued
     """
     
-    def __init__(self, routine, result=False):
+    def __init__(self, routine, join=False):
         """
-        result=True argument indicates that any exception raised or value
-        returned from the co-routine should be saved and returned whenever the
+        join=True argument indicates that any exception raised or value
+        returned from the coroutine should be saved and returned whenever the
         join() method is called. By default the result is passed to sys.
         excepthook() or sys.displayhook() instead.
         """
         
-        self.result = result
+        self.result = join
         self.reapers = list()
         self.routines = [routine]
         try:
-            self.bump()
+            self.resume()
         except:
             self.close()
             raise
@@ -43,9 +43,9 @@ class Routine(object):
     @weakmethod
     def wakeup(self, *args, **kw):
         self.event.close()
-        self.bump(*args, **kw)
+        self.resume(*args, **kw)
     
-    def bump(self, send=None, exc=None):
+    def resume(self, send=None, exc=None):
         if exc is not None:
             try:
                 tb = exc.__traceback__
@@ -144,7 +144,7 @@ class Group(object):
             self.set.pop().close()
 
 class Event(object):
-    """Base class for events that a co-routine can wait on by yielding"""
+    """Base class that an event generator can yield to wait for events"""
     def __init__(self):
         self.callback = None
     
@@ -161,30 +161,29 @@ class Yield(object):
         self.send = send
 
 class Callback(Event):
-    """
-    A simple event triggered by calling it.
+    """A simple event triggered by calling it
     """
     def __call__(self, *args):
-        """Any arguments passed to the callback are yielded from the event as
-        a tuple
+        """
+        Any arguments passed to the callback are yielded from the event as a
+        tuple
         """
         self.callback(args)
 
 class Queue(Event):
-    """
-    An event that may be triggered before it is armed (message queue).
+    """An event that may be triggered before it is armed (message queue)
     """
     def __init__(self):
         Event.__init__(self)
-        self.queue = list()
+        self.queue = deque()
     
     def send(self, value=None):
-        self.queue.append(Record(exc=None, ret=value))
+        self.queue.append(dict(exc=None, ret=value))
         if self.callback is not None:
             self.callback()
     
     def throw(self, exc):
-        self.queue.append(Record(exc=exc))
+        self.queue.append(dict(exc=exc))
         if self.callback is not None:
             self.callback()
     
@@ -196,14 +195,14 @@ class Queue(Event):
     
     def __next__(self):
         try:
-            item = self.queue.pop(0)
+            item = self.queue.popleft()
         except LookupError:
             raise StopIteration()
         
-        if item.exc is None:
-            return item.ret
+        if item["exc"] is None:
+            return item["ret"]
         else:
-            raise item.exc
+            raise item["exc"]
     next = __next__
     
     def __len__(self):
@@ -211,8 +210,7 @@ class Queue(Event):
         return len(self.queue)
 
 class Any(Event):
-    """
-    A composite event that is triggered by any sub-event in a set
+    """A composite event that is triggered by any sub-event in a set
     """
     
     def __init__(self, set=()):
