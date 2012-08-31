@@ -9,6 +9,7 @@ from functools import partial
 from collections import namedtuple
 from collections import Set
 from inspect import getcallargs
+from contextlib import closing
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -297,31 +298,17 @@ def fields(f, *args, **kw):
     f.__dict__.update(*args, **kw)
     return f
 
-class Context(object):
-    def __enter__(self):
-        return self
-    def __exit__(self, *exc):
-        return False
-
-class Cleanup(Context):
+class CloseAll(closing):
     def __init__(self):
-        self.exits = []
+        closing.__init__(self, self)
+        self.set = []
     
-    def __exit__(self, *exc):
-        while self.exits:
-            if self.exits.pop()(*exc):
-                exc = (None, None, None)
-        return exc == (None, None, None)
+    def close(self, *exc):
+        while self.set:
+            self.set.pop().close()
     
-    def __call__(self, context):
-        exit = context.__exit__
-        enter = context.__enter__
-        add_exit = self.exits.append
-        
-        res = enter()
-        add_exit(exit)
-        
-        return res
+    def add(self, handle):
+        self.set.append(handle)
 
 def nop(*args, **kw):
     pass
