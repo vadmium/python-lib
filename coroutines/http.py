@@ -53,9 +53,10 @@ class HTTPConnection(object):
         # else: parser.new_line()
         yield parser.next_char()
         
-        try:
-            # if response does not begin "HTTP/n.n 999 ", assume HTTP/0.9
-            # simple-response
+        #~ try:
+        if True:
+            #~ # if response does not begin "HTTP/n.n 999 ", assume HTTP/0.9
+            #~ # simple-response
             
             try:
                 pre_space = (yield parser.space())
@@ -118,9 +119,13 @@ class HTTPConnection(object):
                     raise BadStatusLine(pre_space + pattern + major + b"." +
                         minor + mid_space + status)
         
-        except BadStatusLine as e:
+        #~ except BadStatusLine as e:
+        if False:
             (pending,) = e.args
-            msg = message_from_string(b"")
+            status = None
+            reason = None
+            from email import message_from_string
+            msg = message_from_string("")
         
         else:
             if int(major) != 1:
