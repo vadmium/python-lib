@@ -13,6 +13,11 @@ from lib import weakmethod
 from sys import exc_info
 from sys import (displayhook, excepthook)
 from collections import deque
+from lib import WrapperFunction
+
+class generator(WrapperFunction):
+    def __call__(self, *args, **kw):
+        return Thread(self.__wrapped__(*args, **kw))
 
 class Thread(object):
     """Schedules an event-driven generator
