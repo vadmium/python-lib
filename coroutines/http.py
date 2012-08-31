@@ -12,9 +12,26 @@ import email.parser
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
+        self.requests = event.Queue()
+        self.request_handler = self.RequestHandler()
     
-    def get(self, hostname, path):
-        yield self.sock.send(b"GET ")
+    def close(self):
+        self.request_handler.close()
+        self.sock.close()
+    
+    @event.generator
+    def RequestHandler(self):
+        while True:
+            if not self.requests:
+                yield self.requests
+            yield next(self.requests)
+    
+    def request(self, method, hostname, path):
+        self.requests.send(self.Request(method, hostname, path))
+    
+    def Request(self, method, hostname, path):
+        yield self.sock.send(method.encode())
+        yield self.sock.send(b" ")
         for c in path.encode("UTF-8"):
             if c <= ord(b" "):
                 yield self.sock.send(b"%{:02X}".format(c))
