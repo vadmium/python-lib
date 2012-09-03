@@ -1,14 +1,16 @@
 import sys
 import weakref
 from os.path import basename
-from sys import modules
-from sys import argv
+import __main__
 import os
 from types import MethodType
 from functools import partial
 from collections import namedtuple
 from collections import Set
 from inspect import getcallargs
+from inspect import getdoc
+from inspect import getfullargspec
+from sys import stderr
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -116,60 +118,89 @@ def assimilate(name, fromlist):
     for name in fromlist:
         setattr(builtins, name, getattr(module, name))
 
-def run_main(module):
-    if module != "__main__":
-        return
-    main = modules[module].main
-    alias_opts = getattr(main, "alias_opts", dict())
+def command(func=None, args=None, *, param_types=dict()):
+    """Invokes a function using CLI arguments
     
-    defaults = getattr(main, "__defaults__", None)
-    if defaults:
-        args = main.__code__.co_varnames[:main.__code__.co_argcount]
-        args = args[-len(defaults):]
-        defaults = ((args[i], value) for (i, value) in enumerate(defaults))
-        defaults = dict(defaults)
-    else:
+    func: Defaults to __main__.main
+    args: Defaults to sys.argv[1:]. If specified, the command name shown in
+        help is taken from func.__name__; otherwise, from sys.argv[0].
+    param_types:  This mapping extends and overrides any "param_types"
+        attribute of "func". The parameter and attribute both map parameter
+        keywords to functions taking an argument string and returning the
+        parameter's data type. By default, arguments are passed to "func" as
+        unconverted strings. The special keywords "*" and "**" apply to any
+        excess positional and keyword arguments.
+    
+    The command option names are the parameter keywords, and hyphenated (-)
+    option names are interpreted as using underscores (_) instead. Options
+    may be prefixed with either a single (-) or a double (--) dash. An
+    option's argument may be separated by an equals sign (=) or may be in a
+    separate argument word.
+    
+    For parameters that default to "False", the command option does not take
+    an argument and sets the corresponding "func" argument to "True". For
+    parameters that default to an empty list, tuple or set, the command
+    option may be given multiple times and are combined into a sequence.
+    
+    Raises SystemExit() when the function was not actually run [TODO: when
+    appropriate]
+    """
+    
+    """Similar implementations:
+    https://pypi.python.org/pypi/clize: adapts the function in two steps
+    http://dev.kylealanhale.com/wiki/projects/quicli: very decorator-happy, with much "argparse" API and little automatic introspection
+    """
+    # return value could be str or int -> System exit
+    
+    if func is None:
+        func = __main__.main
+    if args is None:
+        args = sys.argv[1:]
+    
+    argspec = getfullargspec(func)
+    
+    if argspec.defaults is None:
         defaults = dict()
-    defaults.update(getattr(main, "__kwdefaults__", None) or dict())
+    else:
+        defaults = len(argspec.args) - len(argspec.defaults)
+        defaults = dict(zip(argspec.args[defaults:], argspec.defaults))
+    if argspec.kwonlydefaults is not None:
+        defaults.update(argspec.kwonlydefaults)
     
-    # First guess some attributes from any default values
-    arg_types = dict()
-    seq_args = set()
-    for (opt, value) in defaults.items():
-        if value is False:
-            arg_types[opt] = True
-        if isinstance(value, (tuple, list, Set)):
-            seq_args.add(opt)
+    # Infer parameter modes from default values
+    def noarg_default(default):
+        return default is False
+    def multi_default(default):
+        return isinstance(default, (tuple, list, Set))
     
-    arg_types.update(getattr(main, "arg_types", dict()))
-    arg_types.update(getattr(main, "__annotations__", dict()))
-    seq_args.update(getattr(main, "seq_args", ()))
+    params = set().union(argspec.args, argspec.kwonlyargs)
     
-    auto_help = "help" not in arg_types and "help" not in seq_args
+    for (param, type) in getattr(func, "param_types", dict()):
+        param_types.setdefault(param, type)
     
-    args = list()
+    help = (argspec.varkw is None and "help" not in params)
+    if help:
+        params.add("help")
+        defaults["help"] = False
+    
+    positional = list()
     opts = dict()
-    cmd_args = iter(argv[1:])
+    args = iter(args)
     while True:
         try:
-            arg = next(cmd_args)
+            arg = next(args)
         except StopIteration:
             break
         if arg == "--":
-            args.extend(cmd_args)
+            positional.extend(args)
             break
         
-        try:
-            opt = strip(arg, "-")
-        except ValueError:
-            opt = None
-        
-        if opt:
+        if arg.startswith("-") and arg != "-":
             # Allow options to be preceded by two dashes
-            try:
-                opt = strip(opt, "-")
-            except ValueError:
-                pass
+            if arg.startswith("--"):
+                opt = arg[2:]
+            else:
+                opt = arg[1:]
             
             # Allow argument to be separated by equals sign
             try:
@@ -178,64 +209,102 @@ def run_main(module):
                 arg = None
             
             opt = opt.replace("-", "_")
-            opt = alias_opts.get(opt, opt)
+            if opt in params:
+                key = opt
+            else:
+                key = "**"
             
-            convert = arg_types.get(opt)
-            if convert is True:
-                if opt in seq_args:
-                    if arg is None:
-                        arg = 1
-                    opts[opt] = opts.get(opt, 0) + int(arg)
-                else:
-                    if arg is not None:
-                        raise SystemExit("Option {opt!r} takes no argument".
-                            format_map(locals()))
-                    opts[opt] = convert
+            if noarg_default(defaults.get(key)):
+                if arg is not None:
+                    raise SystemExit("Option {opt!r} takes no argument".
+                        format_map(locals()))
+                opts[opt] = True
             
             else:
                 if arg is None:
                     try:
-                        arg = next(cmd_args)
+                        arg = next(args)
                     except StopIteration:
-                        if auto_help and opt == "help":
-                            help(main)
-                            return
                         raise SystemExit("Option {opt!r} requires an "
                             "argument".format_map(locals()))
                 
-                if opt in arg_types:
+                try:
+                    convert = param_types[key]
+                except LookupError:
+                    pass
+                else:
                     arg = convert(arg)
-                if opt in seq_args:
+                
+                if multi_default(defaults.get(key)):
                     opts.setdefault(opt, list()).append(arg)
                 else:
                     opts[opt] = arg
         
         else:
-            args.append(arg)
+            try:
+                key = argspec.args[len(positional)]
+            except LookupError:
+                key = "*"
+            
+            try:
+                convert = param_types[key]
+            except LookupError:
+                pass
+            else:
+                arg = convert(arg)
+            
+            positional.append(arg)
     
-    for i in range(len(args)):
-        try:
-            convert = arg_types[i]
-        except LookupError:
-            pass
-        else:
-            args[i] = convert(args[i])
+    if help and opts.get("help", False):
+        params = (params.difference(("help",)) or
+            argspec.varargs is not None or argspec.varkw is not None)
+        if params:
+            stderr.write("Parameters:")
+            for param in argspec.args:
+                try:
+                    default = defaults[param]
+                except LookupError:
+                    format = " [--{}=]X"
+                else:
+                    if noarg_default(defaults.get(param)):
+                        format = " [--{} | X]"
+                    elif multi_default(defaults.get(param)):
+                        format = " [--{} . . . | X]"
+                    else:
+                        format = " [[--{}=]X]"
+                stderr.write(format.format(param.replace("_", "-")))
+            if argspec.varargs is not None:
+                stderr.write(
+                    " [{argspec.varargs}  . . .]".format_map(locals()))
+            for param in argspec.kwonlyargs:
+                try:
+                    default = defaults[param]
+                except LookupError:
+                    format = " --{}=X"
+                else:
+                    if noarg_default(default):
+                        format = " [--{}]"
+                    elif multi_default(default):
+                        format = " [--{}=X . . .]"
+                    else:
+                        format = " [--{}=X]"
+                stderr.write(format.format(param.replace("_", "-")))
+            print(file=stderr)
+        
+        doc = getdoc(func)
+        if doc is not None:
+            if params:
+                print(file=stderr)
+            print(doc, file=stderr)
+        
+        return
     
     try:
-        getcallargs(main, *args, **opts)
+        getcallargs(func, *positional, **opts)
     except TypeError as err:
-        if auto_help and "help" in opts:
-            help(main)
-            raise SystemExit()
         raise SystemExit(err)
     
-    try:
-        main(*args, **opts)
-    except TypeError as err:
-        if auto_help and "help" in opts:
-            help(main)
-            raise SystemExit()
-        raise
+    return func(*positional, **opts)
 
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
