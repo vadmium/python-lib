@@ -1,12 +1,15 @@
-# PEP 380 "Syntax for delegating to a subgenerator" [yield from]:
-# http://www.python.org/dev/peps/pep-0380
+"""Support for event-driven generators
 
-# Similar generator wrapper implementation:
-# http://mail.python.org/pipermail/python-dev/2010-July/102320.html
+PEP 380 "Syntax for delegating to a subgenerator" ["yield from"]:
+http://www.python.org/dev/peps/pep-0380
 
-# "Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1
-# apparently only compiles with Python 2.
-# http://www.weightless.io/
+Similar generator wrapper implementation:
+http://mail.python.org/pipermail/python-dev/2010-July/102320.html
+
+"Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1 apparently only compiles with Python 2.
+http://www.weightless.io/
+* Has a survey of other implementations
+"""
 
 import weakref
 from lib import weakmethod
