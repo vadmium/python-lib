@@ -4,6 +4,7 @@ from __future__ import print_function
 from sys import stderr
 from lib import WrapperFunction
 from lib import nop
+from reprlib import repr
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
