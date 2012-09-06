@@ -260,35 +260,40 @@ def command(func=None, args=None, *, param_types=dict()):
             argspec.varargs is not None or argspec.varkw is not None)
         if params:
             stderr.write("Parameters:")
-            for param in argspec.args:
-                try:
-                    default = defaults[param]
-                except LookupError:
-                    format = " [--{}=]X"
-                else:
-                    if noarg_default(defaults.get(param)):
-                        format = " [--{} | X]"
-                    elif multi_default(defaults.get(param)):
-                        format = " [--{} . . . | X]"
+            
+            def print_params(params, defaults, normal, noarg, multi):
+                for param in params:
+                    try:
+                        value = defaults[param]
+                    except LookupError:
+                        value = "X"
+                        format = normal
                     else:
-                        format = " [[--{}=]X]"
-                stderr.write(format.format(param.replace("_", "-")))
+                        if noarg_default(value):
+                            format = noarg
+                        elif multi_default(value):
+                            format = multi
+                        else:
+                            format = normal
+                        format = "[{format}]".format_map(locals())
+                        value = str(value)
+                    param = param.replace("_", "-")
+                    stderr.writelines((" ",
+                        format.format(param=param, value=value)))
+            
+            print_params(argspec.args, defaults,
+                normal="[-{param}=]{value}",
+                noarg="-{param} | {value}",
+                multi="-{param} . . . | {value}",
+            )
             if argspec.varargs is not None:
                 stderr.write(
-                    " [{argspec.varargs}  . . .]".format_map(locals()))
-            for param in argspec.kwonlyargs:
-                try:
-                    default = defaults[param]
-                except LookupError:
-                    format = " --{}=X"
-                else:
-                    if noarg_default(default):
-                        format = " [--{}]"
-                    elif multi_default(default):
-                        format = " [--{}=X . . .]"
-                    else:
-                        format = " [--{}=X]"
-                stderr.write(format.format(param.replace("_", "-")))
+                    " [{argspec.varargs} . . .]".format_map(locals()))
+            print_params(argspec.kwonlyargs, defaults,
+                normal="-{param}={value}",
+                noarg="-{param}",
+                multi="-{param}={value} . . .",
+            )
             print(file=stderr)
         
         doc = getdoc(func)
