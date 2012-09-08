@@ -42,8 +42,10 @@ def help(self):
     
     command(Fixture().f, "-help".split())
     
+    self.maxDiff = None
     self.assertEqual(capture.getvalue(), """\
-Parameters: [-mand=]X [[-defnone=]None] [-noarg | False] [-multi . . . | ()] [var . . .] -mand-opt=X [-optzero=0] [-noarg-opt] [-multi-opt=frozenset() . . .]
+Parameters: [-mand] <str> [[-defnone] <str>] [-noarg | <str>] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
+Defaults: -multi=() -optzero=0 -multi-opt=frozenset()
 
 Test docstring
 """)

@@ -4,6 +4,7 @@ from inspect import getcallargs
 from inspect import getdoc
 from inspect import getfullargspec
 from sys import stderr
+from itertools import chain
 
 def command(func=None, args=None, *, param_types=dict()):
     """Invokes a function using CLI arguments
@@ -125,7 +126,8 @@ def command(func=None, args=None, *, param_types=dict()):
     if help and opts.get("help", False):
         params = (params.difference(("help",)) or
             argspec.varargs is not None or argspec.varkw is not None)
-        print_help(func, params, argspec, defaults)
+        defaults.pop("help", False)
+        print_help(func, params, argspec, defaults, param_types)
         return
     
     try:
@@ -135,22 +137,42 @@ def command(func=None, args=None, *, param_types=dict()):
     
     return func(*positional, **opts)
 
-def print_help(func, params, argspec, defaults):
+def print_help(func, params, argspec, defaults, param_types):
     if params:
         stderr.write("Parameters:")
-        print_params(argspec.args, defaults,
-            normal="[-{param}=]{value}",
-            noarg="-{param} | {value}",
-            multi="-{param} . . . | {value}",
+        print_params(argspec.args, defaults, param_types,
+            normal="[-{param}] <{value}>",
+            noarg="-{param} | <{value}>",
         )
         if argspec.varargs is not None:
-            stderr.write(
-                " [{argspec.varargs} . . .]".format_map(locals()))
-        print_params(argspec.kwonlyargs, defaults,
-            normal="-{param}={value}",
+            value = argspec.varargs
+            try:
+                type = param_types["*"]
+            except LookupError:
+                pass
+            else:
+                value = "{value}: {type.__name__}".format_map(locals())
+            stderr.write(" [<{value}> . . .]".format_map(locals()))
+        print_params(argspec.kwonlyargs, defaults, param_types,
+            normal="-{param}=<{value}>",
             noarg="-{param}",
-            multi="-{param}={value} . . .",
         )
+        
+        first = True
+        for param in chain(argspec.args, argspec.kwonlyargs):
+            try:
+                default = defaults[param]
+            except LookupError:
+                continue
+            if default is None or noarg_default(default):
+                continue
+            
+            if first:
+                stderr.write("\n" "Defaults:")
+                first = False
+            param = param.replace("_", "-")
+            stderr.write(" -{param}={default!s}".format_map(locals()))
+        
         print(file=stderr)
     
     doc = getdoc(func)
@@ -159,22 +181,21 @@ def print_help(func, params, argspec, defaults):
             print(file=stderr)
         print(doc, file=stderr)
 
-def print_params(params, defaults, normal, noarg, multi):
+def print_params(params, defaults, types, normal, noarg):
     for param in params:
+        value = types.get(param, str).__name__
         try:
-            value = defaults[param]
+            default = defaults[param]
         except LookupError:
-            value = "X"
             format = normal
         else:
-            if noarg_default(value):
+            if noarg_default(default):
                 format = noarg
-            elif multi_default(value):
-                format = multi
             else:
                 format = normal
+            if multi_default(default):
+                format = "{format} . . .".format_map(locals())
             format = "[{format}]".format_map(locals())
-            value = str(value)
         param = param.replace("_", "-")
         stderr.writelines((" ", format.format(param=param, value=value)))
 
