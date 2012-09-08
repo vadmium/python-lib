@@ -1,5 +1,4 @@
 import sys
-import __main__
 from collections import Set
 from inspect import getcallargs
 from inspect import getdoc
@@ -41,7 +40,7 @@ def command(func=None, args=None, *, param_types=dict()):
     # return value could be str or int -> System exit
     
     if func is None:
-        func = __main__.main
+        from __main__ import main as func
     if args is None:
         args = sys.argv[1:]
     
@@ -54,12 +53,6 @@ def command(func=None, args=None, *, param_types=dict()):
         defaults = dict(zip(argspec.args[defaults:], argspec.defaults))
     if argspec.kwonlydefaults is not None:
         defaults.update(argspec.kwonlydefaults)
-    
-    # Infer parameter modes from default values
-    def noarg_default(default):
-        return default is False
-    def multi_default(default):
-        return isinstance(default, (tuple, list, Set))
     
     params = set().union(argspec.args, argspec.kwonlyargs)
     
@@ -148,27 +141,6 @@ def command(func=None, args=None, *, param_types=dict()):
             argspec.varargs is not None or argspec.varkw is not None)
         if params:
             stderr.write("Parameters:")
-            
-            def print_params(params, defaults, normal, noarg, multi):
-                for param in params:
-                    try:
-                        value = defaults[param]
-                    except LookupError:
-                        value = "X"
-                        format = normal
-                    else:
-                        if noarg_default(value):
-                            format = noarg
-                        elif multi_default(value):
-                            format = multi
-                        else:
-                            format = normal
-                        format = "[{format}]".format_map(locals())
-                        value = str(value)
-                    param = param.replace("_", "-")
-                    stderr.writelines((" ",
-                        format.format(param=param, value=value)))
-            
             print_params(argspec.args, defaults,
                 normal="[-{param}=]{value}",
                 noarg="-{param} | {value}",
@@ -198,3 +170,28 @@ def command(func=None, args=None, *, param_types=dict()):
         raise SystemExit(err)
     
     return func(*positional, **opts)
+
+def print_params(params, defaults, normal, noarg, multi):
+    for param in params:
+        try:
+            value = defaults[param]
+        except LookupError:
+            value = "X"
+            format = normal
+        else:
+            if noarg_default(value):
+                format = noarg
+            elif multi_default(value):
+                format = multi
+            else:
+                format = normal
+            format = "[{format}]".format_map(locals())
+            value = str(value)
+        param = param.replace("_", "-")
+        stderr.writelines((" ", format.format(param=param, value=value)))
+
+# Infer parameter modes from default values
+def noarg_default(default):
+    return default is False
+def multi_default(default):
+    return isinstance(default, (tuple, list, Set))
