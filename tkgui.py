@@ -3,10 +3,10 @@ from tkinter.ttk import (Button, Entry, Frame, LabelFrame)
 import tkinter
 from tkinter.filedialog import (askopenfilename, asksaveasfilename)
 from tkinter import Toplevel
-from lib.tk import ScrolledTree
+from tkwrap import ScrolledTree
 from tkinter.font import nametofont
-from lib.tk import font_size
-from lib.tk import Form
+from tkwrap import font_size
+from tkwrap import Form
 from guis import InnerClass
 from guis import label_key
 from collections import (Mapping, Iterable)
