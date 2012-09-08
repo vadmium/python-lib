@@ -4,17 +4,11 @@ from os.path import basename
 import os
 from types import MethodType
 from functools import partial
-from collections import namedtuple
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
 except ImportError:
     from urlparse import (urlsplit, urlunsplit)
-
-try:
-    import builtins
-except ImportError:
-    import __builtin__ as builtins
 
 try:
     from io import SEEK_CUR
@@ -99,19 +93,6 @@ def gen_repr(gi):
         return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
 
-class Record(object):
-    def __init__(self, *args, **kw):
-        self.__dict__.update(*args, **kw)
-    def __repr__(self):
-        return "{0}({1})".format(type(self).__name__,
-            ", ".join("{0}={1!r}".format(name, value)
-            for (name, value) in self.__dict__.items()))
-
-def assimilate(name, fromlist):
-    module = __import__(name, fromlist=fromlist)
-    for name in fromlist:
-        setattr(builtins, name, getattr(module, name))
-
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
     for root_dir in path_split(old):
@@ -166,12 +147,6 @@ def url_port(url, scheme, ports):
     return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
-@deco_factory
-def fields(f, *args, **kw):
-    "Decorator factory to add arbitrary fields to function object"
-    f.__dict__.update(*args, **kw)
-    return f
-
 class Cleanup:
     def __init__(self):
         self.exits = []
@@ -194,11 +169,3 @@ class Cleanup:
         add_exit(exit)
         
         return res
-
-def nop(*args, **kw):
-    pass
-
-FieldType = namedtuple("Field", "key, value")
-def Field(**kw):
-    (field,) = kw.items()
-    return FieldType(*field)
