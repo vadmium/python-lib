@@ -2,13 +2,13 @@ from functools import partial
 from functools import reduce
 from operator import or_
 from math import ceil
-from . import event
-from lib import Record
+import eventgen
 import tkinter
 from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
+from collections import namedtuple
 
 class Form(object):
     def __init__(self, master, column=0):
@@ -73,19 +73,19 @@ class ScrolledTree(Frame):
         self.auto_width = list()
         for (key, value) in zip(self.columns(), columns):
             if isinstance(value, str):
-                value = Record(heading=value)
+                value = dict(heading=value)
             
             if headings:
                 try:
-                    heading = value.heading
-                except AttributeError:
+                    heading = value["heading"]
+                except LookupError:
                     pass
                 else:
                     self.tree.heading(key, text=heading)
             
             try:
-                width = value.width
-            except AttributeError:
+                width = value["width"]
+            except LookupError:
                 auto = True
                 
                 if headings:
@@ -105,7 +105,7 @@ class ScrolledTree(Frame):
             
             self.auto_width.append(auto)
             width = max(width, self.tree.column(key, option="minwidth"))
-            stretch = getattr(value, "stretch", False)
+            stretch = value.get("stretch", False)
             self.tree.column(key, stretch=stretch, width=width)
     EM = "\N{EM SPACE}"
     FIGURE = "\N{FIGURE SPACE}"
@@ -180,37 +180,38 @@ if False:
 def EventDriver(widget):
     # Create subclasses with "widget" as a member that inherit from the
     # driver classes defined below
-    return Record(
+    return EventDriverType(
         FileEvent=type("EventDriver.FileEvent", (FileEvent,), locals()),
         Timer=type("EventDriver.Timer", (Timer,), locals()),
     )
+EventDriverType = namedtuple(EventDriver.__name__, "FileEvent, Timer")
 
-class FileEvent(event.FileEvent):
+class FileEvent(eventgen.FileEvent):
     from tkinter import (READABLE as READ, WRITABLE as WRITE)
     
     def __init__(self, *args, **kw):
         self.tk = self.widget.tk
-        event.FileEvent.__init__(self, *args, **kw)
+        eventgen.FileEvent.__init__(self, *args, **kw)
     
     def watch(self, ops):
         self.ops = reduce(or_, ops)
     
     def arm(self, *args, **kw):
-        event.FileEvent.arm(self, *args, **kw)
+        eventgen.FileEvent.arm(self, *args, **kw)
         self.tk.createfilehandler(self.fd, self.ops, self.handler)
     
     def close(self, *args, **kw):
         self.tk.deletefilehandler(self.fd)
-        event.FileEvent.close(self, *args, **kw)
+        eventgen.FileEvent.close(self, *args, **kw)
     
     def handler(self, fd, mask):
         if self.callback is not None:
             return self.callback((fd, set(op for op in
                 (self.READ, self.WRITE) if mask & op)))
 
-class Timer(event.Event):
+class Timer(eventgen.Event):
     def __init__(self):
-        event.Event.__init__(self)
+        eventgen.Event.__init__(self)
         self.timer = None
     
     def start(self, timeout):

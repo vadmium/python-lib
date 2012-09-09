@@ -12,9 +12,8 @@ http://www.weightless.io/
 """
 
 import weakref
-from lib import weakmethod
+from misc import weakmethod
 from sys import exc_info
-from lib import Record
 from sys import (displayhook, excepthook)
 
 class Routine(object):
@@ -182,12 +181,12 @@ class Queue(Event):
         self.queue = list()
     
     def send(self, value=None):
-        self.queue.append(Record(exc=None, ret=value))
+        self.queue.append(dict(ret=value))
         if self.callback is not None:
             self.callback()
     
     def throw(self, exc):
-        self.queue.append(Record(exc=exc))
+        self.queue.append(dict(exc=exc))
         if self.callback is not None:
             self.callback()
     
@@ -203,10 +202,12 @@ class Queue(Event):
         except LookupError:
             raise StopIteration()
         
-        if item.exc is None:
-            return item.ret
+        try:
+            exc = item["exc"]
+        except LookupError:
+            return item["ret"]
         else:
-            raise item.exc
+            raise exc
     next = __next__
     
     def __len__(self):
