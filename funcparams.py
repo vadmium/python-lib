@@ -39,25 +39,11 @@ def command(func=None, args=None, *, param_types=dict()):
     """
     # return value could be str or int -> System exit
     
-    if func is None:
-        from __main__ import main as func
+    (func, argspec, param_types, defaults) = inspect(func, param_types)
     if args is None:
         args = sys.argv[1:]
     
-    argspec = getfullargspec(func)
-    
-    if argspec.defaults is None:
-        defaults = dict()
-    else:
-        defaults = len(argspec.args) - len(argspec.defaults)
-        defaults = dict(zip(argspec.args[defaults:], argspec.defaults))
-    if argspec.kwonlydefaults is not None:
-        defaults.update(argspec.kwonlydefaults)
-    
     params = set().union(argspec.args, argspec.kwonlyargs)
-    
-    for (param, type) in getattr(func, "param_types", dict()):
-        param_types.setdefault(param, type)
     
     help = (argspec.varkw is None and "help" not in params)
     if help:
@@ -139,29 +125,7 @@ def command(func=None, args=None, *, param_types=dict()):
     if help and opts.get("help", False):
         params = (params.difference(("help",)) or
             argspec.varargs is not None or argspec.varkw is not None)
-        if params:
-            stderr.write("Parameters:")
-            print_params(argspec.args, defaults,
-                normal="[-{param}=]{value}",
-                noarg="-{param} | {value}",
-                multi="-{param} . . . | {value}",
-            )
-            if argspec.varargs is not None:
-                stderr.write(
-                    " [{argspec.varargs} . . .]".format_map(locals()))
-            print_params(argspec.kwonlyargs, defaults,
-                normal="-{param}={value}",
-                noarg="-{param}",
-                multi="-{param}={value} . . .",
-            )
-            print(file=stderr)
-        
-        doc = getdoc(func)
-        if doc is not None:
-            if params:
-                print(file=stderr)
-            print(doc, file=stderr)
-        
+        print_help(func, params, argspec, defaults)
         return
     
     try:
@@ -170,6 +134,30 @@ def command(func=None, args=None, *, param_types=dict()):
         raise SystemExit(err)
     
     return func(*positional, **opts)
+
+def print_help(func, params, argspec, defaults):
+    if params:
+        stderr.write("Parameters:")
+        print_params(argspec.args, defaults,
+            normal="[-{param}=]{value}",
+            noarg="-{param} | {value}",
+            multi="-{param} . . . | {value}",
+        )
+        if argspec.varargs is not None:
+            stderr.write(
+                " [{argspec.varargs} . . .]".format_map(locals()))
+        print_params(argspec.kwonlyargs, defaults,
+            normal="-{param}={value}",
+            noarg="-{param}",
+            multi="-{param}={value} . . .",
+        )
+        print(file=stderr)
+    
+    doc = getdoc(func)
+    if doc is not None:
+        if params:
+            print(file=stderr)
+        print(doc, file=stderr)
 
 def print_params(params, defaults, normal, noarg, multi):
     for param in params:
@@ -189,6 +177,25 @@ def print_params(params, defaults, normal, noarg, multi):
             value = str(value)
         param = param.replace("_", "-")
         stderr.writelines((" ", format.format(param=param, value=value)))
+
+def inspect(func, param_types):
+    if func is None:
+        from __main__ import main as func
+    
+    argspec = getfullargspec(func)
+    
+    if argspec.defaults is None:
+        defaults = dict()
+    else:
+        defaults = len(argspec.args) - len(argspec.defaults)
+        defaults = dict(zip(argspec.args[defaults:], argspec.defaults))
+    if argspec.kwonlydefaults is not None:
+        defaults.update(argspec.kwonlydefaults)
+    
+    for (param, type) in getattr(func, "param_types", dict()):
+        param_types.setdefault(param, type)
+    
+    return (func, argspec, param_types, defaults)
 
 # Infer parameter modes from default values
 def noarg_default(default):
