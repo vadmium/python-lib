@@ -2,18 +2,9 @@
 
 import sys
 from io import StringIO
-from contextlib import contextmanager
 from unittest import (TestCase, TestSuite)
 from misc import deco_factory
-
-@contextmanager
-def monkeypatch(module, var, value):
-    orig = getattr(module, var)
-    try:
-        setattr(module, var, value)
-        yield
-    finally:
-        setattr(module, var, orig)
+from funcparams import command
 
 @deco_factory
 def suite_add(suite, Test):
@@ -28,19 +19,14 @@ def load_tests(loader, default, pattern):
     return suite
 suite = TestSuite()
 
-capture = StringIO()
-with monkeypatch(sys, "stderr", capture):
-    from funcparams import command
-
 @suite_add(suite)
 @testfunc()
 def help(self):
     """Test help works and everything that is meant to be there is there"""
     
-    capture.seek(0)
-    capture.truncate()
-    
-    command(Fixture().f, "-help".split())
+    capture = StringIO()
+    from funcparams import help
+    help(Fixture().f, capture)
     
     self.maxDiff = None
     self.assertEqual(capture.getvalue(), """\

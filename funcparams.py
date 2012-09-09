@@ -46,8 +46,8 @@ def command(func=None, args=None, *, param_types=dict()):
     
     params = set().union(argspec.args, argspec.kwonlyargs)
     
-    help = (argspec.varkw is None and "help" not in params)
-    if help:
+    auto_help = (argspec.varkw is None and "help" not in params)
+    if auto_help:
         params.add("help")
         defaults["help"] = False
     
@@ -123,11 +123,8 @@ def command(func=None, args=None, *, param_types=dict()):
             
             positional.append(arg)
     
-    if help and opts.get("help", False):
-        params = (params.difference(("help",)) or
-            argspec.varargs is not None or argspec.varkw is not None)
-        defaults.pop("help", False)
-        print_help(func, params, argspec, defaults, param_types)
+    if auto_help and opts.get("help", False):
+        help(func, param_types=param_types)
         return
     
     try:
@@ -137,10 +134,13 @@ def command(func=None, args=None, *, param_types=dict()):
     
     return func(*positional, **opts)
 
-def print_help(func, params, argspec, defaults, param_types):
+def help(func=None, file=stderr, *, param_types=dict()):
+    (func, argspec, param_types, defaults) = inspect(func, param_types)
+    params = (argspec.args or argspec.varargs is not None or
+        argspec.kwonlyargs or argspec.varkw is not None)
     if params:
-        stderr.write("Parameters:")
-        print_params(argspec.args, defaults, param_types,
+        file.write("Parameters:")
+        print_params(argspec.args, file, defaults, param_types,
             normal="[-{param}] <{value}>",
             noarg="-{param} | <{value}>",
         )
@@ -152,11 +152,15 @@ def print_help(func, params, argspec, defaults, param_types):
                 pass
             else:
                 value = "{value}: {type.__name__}".format_map(locals())
-            stderr.write(" [<{value}> . . .]".format_map(locals()))
-        print_params(argspec.kwonlyargs, defaults, param_types,
+            file.write(" [<{value}> . . .]".format_map(locals()))
+        print_params(argspec.kwonlyargs, file, defaults, param_types,
             normal="-{param}=<{value}>",
             noarg="-{param}",
         )
+        if argspec.varkw is not None:
+            type = param_types.get("**", str).__name__
+            file.write(
+                " [-{argspec.varkw}=<{type}> . . .]".format_map(locals()))
         
         first = True
         for param in chain(argspec.args, argspec.kwonlyargs):
@@ -168,20 +172,20 @@ def print_help(func, params, argspec, defaults, param_types):
                 continue
             
             if first:
-                stderr.write("\n" "Defaults:")
+                file.write("\n" "Defaults:")
                 first = False
             param = param.replace("_", "-")
-            stderr.write(" -{param}={default!s}".format_map(locals()))
+            file.write(" -{param}={default!s}".format_map(locals()))
         
-        print(file=stderr)
+        print(file=file)
     
     doc = getdoc(func)
     if doc is not None:
         if params:
-            print(file=stderr)
-        print(doc, file=stderr)
+            print(file=file)
+        print(doc, file=file)
 
-def print_params(params, defaults, types, normal, noarg):
+def print_params(params, file, defaults, types, normal, noarg):
     for param in params:
         value = types.get(param, str).__name__
         try:
@@ -197,7 +201,7 @@ def print_params(params, defaults, types, normal, noarg):
                 format = "{format} . . .".format_map(locals())
             format = "[{format}]".format_map(locals())
         param = param.replace("_", "-")
-        stderr.writelines((" ", format.format(param=param, value=value)))
+        file.writelines((" ", format.format(param=param, value=value)))
 
 def inspect(func, param_types):
     if func is None:
