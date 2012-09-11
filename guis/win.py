@@ -14,8 +14,8 @@ from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND, WM_NOTIFY)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
-from guis import label_key
-from guis import InnerClass
+from . import label_key
+from . import InnerClass
 from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import (BS_GROUPBOX, BS_PUSHBUTTON)

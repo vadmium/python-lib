@@ -7,8 +7,8 @@ from tkwrap import ScrolledTree
 from tkinter.font import nametofont
 from tkwrap import font_size
 from tkwrap import Form
-from guis import InnerClass
-from guis import label_key
+from . import InnerClass
+from . import label_key
 from collections import (Mapping, Iterable)
 
 class Ttk(object):
