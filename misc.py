@@ -145,7 +145,7 @@ def url_port(url, scheme, ports):
     if port is None:
         port = def_port
     path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
-    return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
+    return dict(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
 class CloseAll(closing):
