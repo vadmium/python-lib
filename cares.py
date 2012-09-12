@@ -14,8 +14,8 @@ from ctypes import (
     c_char_p, c_void_p, c_int, c_char, c_ushort, c_long,
     byref, CFUNCTYPE, POINTER, Structure,
 )
-from lib import exc_sink
-from lib import weakmethod
+from misc import exc_sink
+from misc import weakmethod
 from collections import namedtuple
 from socket import inet_ntop
 
