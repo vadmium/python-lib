@@ -9,6 +9,7 @@ from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
 from collections import namedtuple
+from itertools import cycle
 
 class Form(object):
     def __init__(self, master, column=0):
@@ -42,6 +43,7 @@ class ScrolledTree(Frame):
             self.nontree_columns = len(columns)
         except TypeError:
             self.nontree_columns = columns
+            columns = cycle((dict(),))
         
         show = list()
         self.tree_shown = tree
