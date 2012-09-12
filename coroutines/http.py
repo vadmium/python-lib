@@ -12,14 +12,14 @@ import email.parser
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
-        self.requests = event.Queue()
+        self.requests = eventgen.Queue()
         self.request_handler = self.RequestHandler()
     
     def close(self):
         self.request_handler.close()
         self.sock.close()
     
-    @event.generator
+    @eventgen.generator
     def RequestHandler(self):
         while True:
             if not self.requests:
