@@ -6,7 +6,7 @@ API modelled around the built-in "http.client" package
 
 from http.client import (
     HTTP_PORT, UnknownTransferEncoding, BadStatusLine, UnknownProtocol)
-from lib import event
+import eventgen
 import email.parser
 
 class HTTPConnection(object):
@@ -256,10 +256,10 @@ class ChunkedResponse(HTTPResponse):
                 yield self.after_eol()
             
             if not size:
-                yield event.Yield((0, b""))
+                yield eventgen.Yield((0, b""))
                 break
             
-            yield event.Yield((size, parser.c))
+            yield eventgen.Yield((size, parser.c))
             
             yield parser.next_char()
         else:
