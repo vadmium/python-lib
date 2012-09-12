@@ -2,8 +2,8 @@
 from __future__ import print_function
 
 from sys import stderr
-from lib import WrapperFunction
-from lib import nop
+from misc import WrapperFunction
+from reprlib import repr
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
@@ -96,3 +96,6 @@ startline = True
 def margin(file):
     for _ in range(indent):
         file.write("  ")
+
+def nop(*pos, **kw):
+    pass

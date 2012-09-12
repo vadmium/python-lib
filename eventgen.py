@@ -1,19 +1,22 @@
-# PEP 380 "Syntax for delegating to a subgenerator" [yield from]:
-# http://www.python.org/dev/peps/pep-0380
+"""Support for event-driven generators
 
-# Similar generator wrapper implementation:
-# https://mail.python.org/pipermail/python-dev/2010-July/102320.html
+PEP 380 "Syntax for delegating to a subgenerator" ["yield from"]:
+http://www.python.org/dev/peps/pep-0380
 
-# "Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1
-# apparently only compiles with Python 2.
-# http://www.weightless.io/
+Similar generator wrapper implementation:
+https://mail.python.org/pipermail/python-dev/2010-July/102320.html
+
+"Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1 apparently only compiles with Python 2.
+http://www.weightless.io/
+* Has a survey of other implementations
+"""
 
 import weakref
-from lib import weakmethod
+from misc import weakmethod
 from sys import exc_info
 from sys import (displayhook, excepthook)
 from collections import deque
-from lib import WrapperFunction
+from misc import WrapperFunction
 
 class generator(WrapperFunction):
     def __call__(self, *args, **kw):
@@ -172,7 +175,7 @@ class Queue(Event):
         self.queue = deque()
     
     def send(self, value=None):
-        self.queue.append(dict(exc=None, ret=value))
+        self.queue.append(dict(ret=value))
         if self.callback is not None:
             self.callback()
     
@@ -193,10 +196,12 @@ class Queue(Event):
         except LookupError:
             raise StopIteration()
         
-        if item["exc"] is None:
+        try:
+            exc = item["exc"]
+        except LookupError:
             return item["ret"]
         else:
-            raise item["exc"]
+            raise exc
     next = __next__
     
     def __len__(self):

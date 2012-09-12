@@ -1,25 +1,15 @@
 import sys
 import weakref
 from os.path import basename
-from sys import modules
-from sys import argv
 import os
 from types import MethodType
 from functools import partial
-from collections import namedtuple
-from collections import Set
-from inspect import getcallargs
 from contextlib import closing
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
 except ImportError:
     from urlparse import (urlsplit, urlunsplit)
-
-try:
-    import builtins
-except ImportError:
-    import __builtin__ as builtins
 
 try:
     from io import SEEK_CUR
@@ -104,140 +94,6 @@ def gen_repr(gi):
         return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
 
-class Record(object):
-    def __init__(self, *args, **kw):
-        self.__dict__.update(*args, **kw)
-    def __repr__(self):
-        return "{0}({1})".format(type(self).__name__,
-            ", ".join("{0}={1!r}".format(name, value)
-            for (name, value) in self.__dict__.items()))
-
-def assimilate(name, fromlist):
-    module = __import__(name, fromlist=fromlist)
-    for name in fromlist:
-        setattr(builtins, name, getattr(module, name))
-
-def run_main(module):
-    if module != "__main__":
-        return
-    main = modules[module].main
-    alias_opts = getattr(main, "alias_opts", dict())
-    
-    defaults = getattr(main, "__defaults__", None)
-    if defaults:
-        args = main.__code__.co_varnames[:main.__code__.co_argcount]
-        args = args[-len(defaults):]
-        defaults = ((args[i], value) for (i, value) in enumerate(defaults))
-        defaults = dict(defaults)
-    else:
-        defaults = dict()
-    defaults.update(getattr(main, "__kwdefaults__", None) or dict())
-    
-    # First guess some attributes from any default values
-    arg_types = dict()
-    seq_args = set()
-    for (opt, value) in defaults.items():
-        if value is False:
-            arg_types[opt] = True
-        if isinstance(value, (tuple, list, Set)):
-            seq_args.add(opt)
-    
-    arg_types.update(getattr(main, "arg_types", dict()))
-    arg_types.update(getattr(main, "__annotations__", dict()))
-    seq_args.update(getattr(main, "seq_args", ()))
-    
-    auto_help = "help" not in arg_types and "help" not in seq_args
-    
-    args = list()
-    opts = dict()
-    cmd_args = iter(argv[1:])
-    while True:
-        try:
-            arg = next(cmd_args)
-        except StopIteration:
-            break
-        if arg == "--":
-            args.extend(cmd_args)
-            break
-        
-        try:
-            opt = strip(arg, "-")
-        except ValueError:
-            opt = None
-        
-        if opt:
-            # Allow options to be preceded by two dashes
-            try:
-                opt = strip(opt, "-")
-            except ValueError:
-                pass
-            
-            # Allow argument to be separated by equals sign
-            try:
-                (opt, arg) = opt.split("=")
-            except ValueError:
-                arg = None
-            
-            opt = opt.replace("-", "_")
-            opt = alias_opts.get(opt, opt)
-            
-            convert = arg_types.get(opt)
-            if convert is True:
-                if opt in seq_args:
-                    if arg is None:
-                        arg = 1
-                    opts[opt] = opts.get(opt, 0) + int(arg)
-                else:
-                    if arg is not None:
-                        raise SystemExit("Option {opt!r} takes no argument".
-                            format_map(locals()))
-                    opts[opt] = convert
-            
-            else:
-                if arg is None:
-                    try:
-                        arg = next(cmd_args)
-                    except StopIteration:
-                        if auto_help and opt == "help":
-                            help(main)
-                            return
-                        raise SystemExit("Option {opt!r} requires an "
-                            "argument".format_map(locals()))
-                
-                if opt in arg_types:
-                    arg = convert(arg)
-                if opt in seq_args:
-                    opts.setdefault(opt, list()).append(arg)
-                else:
-                    opts[opt] = arg
-        
-        else:
-            args.append(arg)
-    
-    for i in range(len(args)):
-        try:
-            convert = arg_types[i]
-        except LookupError:
-            pass
-        else:
-            args[i] = convert(args[i])
-    
-    try:
-        getcallargs(main, *args, **opts)
-    except TypeError as err:
-        if auto_help and "help" in opts:
-            help(main)
-            raise SystemExit()
-        raise SystemExit(err)
-    
-    try:
-        main(*args, **opts)
-    except TypeError as err:
-        if auto_help and "help" in opts:
-            help(main)
-            raise SystemExit()
-        raise
-
 def transplant(path, old="/", new=""):
     path_dirs = path_split(path)
     for root_dir in path_split(old):
@@ -292,12 +148,6 @@ def url_port(url, scheme, ports):
     return Record(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
-@deco_factory
-def fields(f, *args, **kw):
-    "Decorator factory to add arbitrary fields to function object"
-    f.__dict__.update(*args, **kw)
-    return f
-
 class CloseAll(closing):
     def __init__(self):
         closing.__init__(self, self)
@@ -309,11 +159,3 @@ class CloseAll(closing):
     
     def add(self, handle):
         self.set.append(handle)
-
-def nop(*args, **kw):
-    pass
-
-FieldType = namedtuple("Field", "key, value")
-def Field(**kw):
-    (field,) = kw.items()
-    return FieldType(*field)
