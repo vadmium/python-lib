@@ -80,8 +80,11 @@ class Thread(object):
                             send = None
                     else:
                         # Saving traceback creates circular reference
-                        # Remove our throw or send call from traceback
-                        tb = exc_info()[2].tb_next
+                        # Remove our throw or send call from traceback, but
+                        # only if there is more traceback
+                        (_, _, tb) = exc_info()
+                        if tb.tb_next:
+                            tb = tb.tb_next
                         if hasattr(e, "__traceback__"):
                             e.__traceback__ = tb
                         exc = (type(e), e, tb)
@@ -115,6 +118,7 @@ class Thread(object):
         
         finally:
             # Break circular reference if traceback includes this function
+            del tb
             del exc
     
     def close(self):
