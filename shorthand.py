@@ -25,6 +25,16 @@ def assimilate(name, fromlist):
     for name in fromlist:
         setattr(builtins, name, getattr(module, name))
 
+def strip(s, start="", end=""):
+    if start and not s.startswith(start):
+        raise ValueError("Expected {0!r} starting string".format(start))
+    if end and not s.endswith(end):
+        raise ValueError("Expected {0!r} ending string".format(end))
+    if len(s) < len(start) + len(end):
+        raise ValueError(
+            "String not enclosed by {0!r} and {1!r}".format(start, end))
+    return s[len(start):len(s) - len(end)]
+
 @deco_factory
 def fields(f, *args, **kw):
     "Decorator factory to add arbitrary fields to function object"
