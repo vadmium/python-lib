@@ -19,7 +19,7 @@ class HTTPConnection(object):
         self.request_handler.close()
         self.sock.close()
     
-    @eventgen.generator
+    @eventgen.routine
     def RequestHandler(self):
         while True:
             if not self.requests:
