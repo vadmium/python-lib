@@ -183,8 +183,8 @@ def EventDriver(widget):
     # Create subclasses with "widget" as a member that inherit from the
     # driver classes defined below
     return EventDriverType(
-        FileEvent=type("EventDriver.FileEvent", (FileEvent,), locals()),
-        Timer=type("EventDriver.Timer", (Timer,), locals()),
+        FileEvent=type(FileEvent.__name__, (FileEvent,), locals()),
+        Timer=type(Timer.__name__, (Timer,), locals()),
     )
 EventDriverType = namedtuple(EventDriver.__name__, "FileEvent, Timer")
 
@@ -207,9 +207,8 @@ class FileEvent(eventgen.FileEvent):
         eventgen.FileEvent.close(self, *args, **kw)
     
     def handler(self, fd, mask):
-        if self.callback is not None:
-            return self.callback((fd, set(op for op in
-                (self.READ, self.WRITE) if mask & op)))
+        trigger = set(op for op in (self.READ, self.WRITE) if mask & op)
+        return self.callback(eventgen.Send((fd, trigger)))
 
 class Timer(eventgen.Event):
     def __init__(self):
@@ -223,5 +222,4 @@ class Timer(eventgen.Event):
         self.widget.after_cancel(self.timer)
     
     def handler(self):
-        if self.callback is not None:
-            return self.callback()
+        return self.callback()
