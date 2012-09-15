@@ -43,8 +43,8 @@ class FileEvent(BaseFileEvent):
     def watch(self, ops):
         self.ops = reduce(or_, ops)
     
-    def arm(self, *args, **kw):
-        BaseFileEvent.arm(self, *args, **kw)
+    def block(self, *args, **kw):
+        BaseFileEvent.block(self, *args, **kw)
         self.tk.createfilehandler(self.fd, self.ops, self.handler)
     
     def close(self, *args, **kw):

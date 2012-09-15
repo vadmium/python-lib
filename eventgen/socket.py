@@ -4,10 +4,7 @@ from errno import (EINPROGRESS, EAGAIN)
 from ssl import (SSLError, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_WRITE)
 
 class Socket:
-    """
-    Wraps a Python socket. Provides co-routines for common blocking socket
-    operations, intended for use with the event.Routine class.
-    """
+    """Provides event generators for common blocking socket operations"""
     
     def __init__(self, event_driver, *args, **kw):
         self.sock = socket.socket(*args, **kw)

@@ -64,12 +64,13 @@ class Throw(object):
     def default(self):
         sys.excepthook(*self.exc)
 
-class generator(WrapperFunction):
+class routine(WrapperFunction):
+    """Decorator converting generator factory into Thread() factory"""
     def __call__(self, *args, **kw):
         return Thread(self.__wrapped__(*args, **kw))
 
 class Thread(object):
-    """Schedules an event-driven generator
+    """Schedules the logical execution thread of an event-driven generator
     
     The generator can yield:
     * Event objects, which are waited on before continuing the coroutine
@@ -89,16 +90,16 @@ class Thread(object):
         self.reapers = list()
         self.routines = [routine]
         with firedoor(self):
-            self.resume(Send())
+            self.trampoline(Send())
     
     @weakmethod
-    def wakeup(self, result=Send()):
+    def resume(self, result=Send()):
         self.event.close()
-        self.resume(result)
+        self.trampoline(result)
     
-    def resume(self, result):
+    def trampoline(self, result):
         tb = None  # For seamless deletion at end
-        self.event = None  # Initialise attribute or mark as already closed
+        self.event = None  # Create attribute and mark not active
         
         try:
             while self.routines:
@@ -122,7 +123,7 @@ class Thread(object):
                 else:
                     if isinstance(obj, Event):
                         self.event = obj
-                        self.event.arm(self.wakeup)
+                        self.event.block(self.resume)
                         return
                     elif isinstance(obj, Yield):
                         self.routines.pop()
@@ -179,16 +180,29 @@ class Thread(object):
         return stack
 
 class Event(object):
-    """Base class that an event generator can yield to wait for events"""
+    """Base class that a thread can yield to wait for an event
+    
+    The default implementation has a "callback" attribute which can be called
+    to resume the thread. It is set to None when the event is not active."""
+    
     def __init__(self):
         self.callback = None
     
-    def arm(self, callback):
-        """Registers an object to call when the event is triggered"""
+    def block(self, callback):
+        """Registers a callback to resume the thread
+        
+        The callback may be invoked from the context of another thread, but
+        this involves recursive calls on the subroutine stack, so it should
+        be limited."""
+        
         self.callback = callback
     
     def close(self):
-        """Cancel the effect of the "arm" method call"""
+        """Cancel the effect of the block() call
+        
+        This is automatically called whenever the thread is resumed, or if
+        the thread is closed without being resumed."""
+        
         self.callback = None
 
 class Yield(object):
@@ -200,8 +214,8 @@ class Callback(Event):
     """
     def __call__(self, *args):
         """
-        Any arguments passed to the callback are yielded from the event as a
-        tuple
+        Positional arguments passed to the callback are yielded from the
+        event as a tuple
         """
         self.callback(Send(args))
 
@@ -246,9 +260,8 @@ class Queue(Event):
         """Return the number of messages waiting in the queue"""
         return len(self.queue)
 
-class Any(Event):
-    """A composite event that is triggered by any sub-event in a set
-    """
+class Select(Event):
+    """An event triggered by any of a set of alternatives"""
     
     def __init__(self, set=()):
         Event.__init__(self)
@@ -259,11 +272,11 @@ class Any(Event):
     def add(self, event):
         self.set.append(Subevent(weakref.ref(self), event))
     
-    def arm(self, callback):
-        Event.arm(self, callback)
+    def block(self, callback):
+        Event.block(self, callback)
         try:
             for e in self.set:
-                e.event.arm(e.trigger)
+                e.event.block(e.trigger)
         except:
             i = iter(self.set)
             while True:

@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from . import Any
+from . import Select
 import cares
 from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
@@ -64,7 +64,7 @@ def resolve(event_driver, name, family=AF_UNSPEC):
     
     channel.gethostbyname(name, family, self.host)
     while self.status is None:
-        events = Any(self.files.values())
+        events = Select(self.files.values())
         
         timeout = channel.timeout()
         if timeout is not None:
