@@ -42,6 +42,15 @@ class Tracer(WrapperFunction):
         line()
 
 @contextmanager
+def checkpoint(text, abbrev=()):
+    start()
+    stderr.write(text)
+    with trace_exc(abbrev=abbrev):
+        yield
+    result()
+    line("done")
+
+@contextmanager
 def trace_exc(abbrev=()):
     global indent
     
