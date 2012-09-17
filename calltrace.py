@@ -14,9 +14,10 @@ class traced(WrapperFunction):
             except AttributeError:
                 self.name = reprlib.repr(func)
             else:
-                if ("import" not in abbrev and
-                getattr(func, "__module__", None) is not None):
-                    self.name = "{0}.{1}".format(func.__module__, self.name)
+                if "import" not in abbrev:
+                    module = getattr(func, "__module__", None)
+                    if module is not None:
+                        self.name = "{0}.{1}".format(module, self.name)
         else:
             self.name = name
         self.abbrev = abbrev
@@ -61,15 +62,15 @@ class traced(WrapperFunction):
 def Tracer(name):
     return traced(nop, name=name, abbrev=set(("return",)))
 
-def print_call(name, args, kw, abbrev=set()):
+def print_call(name, pos=(), kw=dict(), abbrev=()):
     print(name, end="(", file=stderr)
     
-    for (k, v) in enumerate(args):
+    for (k, v) in enumerate(pos):
         if k:
             stderr.write(", ")
         stderr.write(repr(v, k in abbrev))
     
-    comma = bool(args)
+    comma = pos
     for (k, v) in kw.items():
         if comma:
             stderr.write(", ")
