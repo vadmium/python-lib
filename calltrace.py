@@ -4,6 +4,7 @@ from __future__ import print_function
 from sys import stderr
 from misc import WrapperFunction
 import reprlib
+from contextlib import contextmanager
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
@@ -23,33 +24,13 @@ class traced(WrapperFunction):
         self.abbrev = abbrev
     
     def __call__(self, *args, **kw):
-        global indent
-        
         start()
         print_call(self.name, args, kw, self.abbrev)
-        stderr.flush()
-        indent += 1
-        try:
+        with trace_exc(abbrev=self.abbrev):
             ret = self.__wrapped__(*args, **kw)
-        except BaseException as exc:
-            self.print_result("raise", exc)
-            raise
-        else:
-            self.print_result("return", ret, "->")
-            return ret
-    
-    def print_result(self, key, v, disp=None):
-        global indent
-        indent -= 1
-        
-        if disp is None:
-            disp = key
-        
-        if midline:
-            stderr.write(" ")
-        else:
-            margin(stderr)
-        line(disp, repr(v, key in self.abbrev))
+        result()
+        line("->", repr(ret, "return" in self.abbrev))
+        return ret
 
 class Tracer(WrapperFunction):
     def __init__(self, name, abbrev=()):
@@ -59,6 +40,27 @@ class Tracer(WrapperFunction):
         start()
         print_call(self.name, pos, kw, abbrev=self.abbrev)
         line()
+
+@contextmanager
+def trace_exc(abbrev=()):
+    global indent
+    
+    stderr.flush()
+    indent += 1
+    try:
+        yield
+    except BaseException as exc:
+        result()
+        line("raise", repr(exc, "raise" in abbrev))
+        raise
+
+def result():
+    global indent
+    indent -= 1
+    if midline:
+        stderr.write(" ")
+    else:
+        margin()
 
 def print_call(name, pos=(), kw=dict(), abbrev=()):
     print(name, end="(", file=stderr)
