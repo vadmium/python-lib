@@ -23,14 +23,9 @@ class traced(WrapperFunction):
         self.abbrev = abbrev
     
     def __call__(self, *args, **kw):
-        global startline
         global indent
         
-        if not startline:
-            print(file=stderr)
-        margin(stderr)
-        startline = False
-        
+        start()
         print_call(self.name, args, kw, self.abbrev)
         stderr.flush()
         indent += 1
@@ -44,23 +39,26 @@ class traced(WrapperFunction):
             return ret
     
     def print_result(self, key, v, disp=None):
-        global startline
         global indent
-        
         indent -= 1
         
         if disp is None:
             disp = key
         
-        if startline:
-            margin(stderr)
-        else:
+        if midline:
             stderr.write(" ")
-        print(disp, repr(v, key in self.abbrev), file=stderr)
-        startline = True
+        else:
+            margin(stderr)
+        line(disp, repr(v, key in self.abbrev))
 
-def Tracer(name):
-    return traced(nop, name=name, abbrev=set(("return",)))
+class Tracer(WrapperFunction):
+    def __init__(self, name, abbrev=()):
+        self.name = name
+        self.abbrev = abbrev
+    def __call__(self, *pos, **kw):
+        start()
+        print_call(self.name, pos, kw, abbrev=self.abbrev)
+        line()
 
 def print_call(name, pos=(), kw=dict(), abbrev=()):
     print(name, end="(", file=stderr)
@@ -86,11 +84,20 @@ def repr(v, abbrev=False):
         return reprlib.repr(v)
 
 indent = 0
-startline = True
+midline = False
 
-def margin(file):
+def start():
+    if midline:
+        line()
+    margin()
+
+def line(*pos, **kw):
+    global midline
+    print(*pos, file=stderr, **kw)
+    midline = False
+
+def margin():
+    global midline
     for _ in range(indent):
-        file.write("  ")
-
-def nop(*pos, **kw):
-    pass
+        stderr.write("  ")
+    midline = True
