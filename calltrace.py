@@ -3,7 +3,7 @@ from __future__ import print_function
 
 from sys import stderr
 from misc import WrapperFunction
-from reprlib import repr
+import reprlib
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
@@ -12,7 +12,7 @@ class traced(WrapperFunction):
             try:
                 self.name = func.__name__
             except AttributeError:
-                self.name = repr(func)
+                self.name = reprlib.repr(func)
             else:
                 if ("import" not in abbrev and
                 getattr(func, "__module__", None) is not None):
@@ -51,15 +51,11 @@ class traced(WrapperFunction):
         if disp is None:
             disp = key
         
-        if key in self.abbrev:
-            v = "..."
-        else:
-            v = repr(v)
         if startline:
             margin(stderr)
         else:
             stderr.write(" ")
-        print(disp, v, file=stderr)
+        print(disp, repr(v, key in self.abbrev), file=stderr)
         startline = True
 
 def Tracer(name):
@@ -71,24 +67,22 @@ def print_call(name, args, kw, abbrev=set()):
     for (k, v) in enumerate(args):
         if k:
             stderr.write(", ")
-        if k in abbrev:
-            v = "..."
-        else:
-            v = repr(v)
-        stderr.write(v)
+        stderr.write(repr(v, k in abbrev))
     
     comma = bool(args)
     for (k, v) in kw.items():
         if comma:
             stderr.write(", ")
-        if k in abbrev:
-            v = "..."
-        else:
-            v = repr(v)
-        stderr.write("{0}={1}".format(k, v))
+        stderr.write("{0}={1}".format(k, repr(v, k in abbrev)))
         comma = True
     
     stderr.write(")")
+
+def repr(v, abbrev=False):
+    if abbrev:
+        return "..."
+    else:
+        return reprlib.repr(v)
 
 indent = 0
 startline = True
