@@ -19,6 +19,7 @@ from collections import deque
 from misc import WrapperFunction
 from functools import partial
 from contextlib import contextmanager
+from traceback import extract_stack
 
 class Send(object):
     def __init__(self, value=None):
@@ -161,6 +162,17 @@ class Thread(object):
     
     def __repr__(self):
         return "<{0} {1:#x}>".format(type(self).__name__, id(self))
+    
+    def extract_stack(self, limit=None):
+        stack = list()
+        for routine in reversed(self.routines):
+            new = extract_stack(routine.gi_frame, limit=limit)
+            if limit is not None:
+                limit -= len(new)
+            stack = new + stack
+            if limit is not None and not limit:
+                break
+        return stack
 
 class Event(object):
     """Base class that an event generator can yield to wait for events"""
