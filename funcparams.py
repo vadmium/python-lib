@@ -82,11 +82,10 @@ def command(func=None, args=None, param_types=dict()):
     """
     # return value could be str or int -> System exit
     
-    (func, argspec, param_types, defaults) = inspect(func, param_types)
+    (func, argspec, params, param_types, defaults) = inspect(
+        func, param_types)
     if args is None:
         args = sys.argv[1:]
-    
-    params = set().union(argspec.args, argspec.kwonlyargs)
     
     auto_help = (argspec.varkw is None and "help" not in params)
     if auto_help:
@@ -178,9 +177,10 @@ def command(func=None, args=None, param_types=dict()):
     return func(*positional, **opts)
 
 def help(func=None, file=stderr, param_types=dict()):
-    (func, argspec, param_types, defaults) = inspect(func, param_types)
-    params = (argspec.args or argspec.varargs is not None or
-        argspec.kwonlyargs or argspec.varkw is not None)
+    (func, argspec, params, param_types, defaults) = inspect(
+        func, param_types)
+    params = (params or
+        argspec.varargs is not None or argspec.varkw is not None)
     if params:
         file.write("Parameters:")
         print_params(argspec.args, file, defaults, param_types,
@@ -261,7 +261,23 @@ def inspect(func, param_types):
         defaults.update(argspec.kwonlydefaults)
     
     param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
-    return (func, argspec, param_types, defaults)
+    
+    params = set().union(argspec.args, argspec.kwonlyargs)
+    for param in param_types:
+        if param == "*":
+            if argspec.varargs is None:
+                raise TypeError("{func.__name__}() does not take "
+                    "variable positional arguments (*)".format(**locals()))
+        elif param == "**":
+            if argspec.varkw is None:
+                raise TypeError("{func.__name__}() does not take "
+                    "variable keyword arguments (**)".format(**locals()))
+        else:
+            if param not in params:
+                raise TypeError("{func.__name__}() does not have "
+                    "a parameter called {param!r}".format(**locals()))
+    
+    return (func, argspec, params, param_types, defaults)
 
 # Infer parameter modes from default values
 def noarg_default(default):
