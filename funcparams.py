@@ -124,7 +124,7 @@ def command(func=None, args=None, param_types=dict()):
             else:
                 if argspec.varkw is None:
                     raise SystemExit("Unexpected option {opt!r}".
-                        format_map(locals()))
+                        format(**locals()))
                 key = "**"
             
             if noarg_default(defaults.get(key)):
