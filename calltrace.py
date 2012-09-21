@@ -3,10 +3,12 @@ from __future__ import print_function
 
 from sys import stderr
 from misc import WrapperFunction
+from contextlib import contextmanager
+
 try:
-    from reprlib import repr
+    import reprlib
 except ImportError:  # Library renamed from Python 2
-    from repr import repr
+    import repr as reprlib
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
@@ -15,90 +17,102 @@ class traced(WrapperFunction):
             try:
                 self.name = func.__name__
             except AttributeError:
-                self.name = repr(func)
+                self.name = reprlib.repr(func)
             else:
-                if ("import" not in abbrev and
-                getattr(func, "__module__", None) is not None):
-                    self.name = "{0}.{1}".format(func.__module__, self.name)
+                if "import" not in abbrev:
+                    module = getattr(func, "__module__", None)
+                    if module is not None:
+                        self.name = "{0}.{1}".format(module, self.name)
         else:
             self.name = name
         self.abbrev = abbrev
     
     def __call__(self, *args, **kw):
-        global startline
-        global indent
-        
-        if not startline:
-            print(file=stderr)
-        margin(stderr)
-        startline = False
-        
+        start()
         print_call(self.name, args, kw, self.abbrev)
-        stderr.flush()
-        indent += 1
-        try:
+        with trace_exc(abbrev=self.abbrev):
             ret = self.__wrapped__(*args, **kw)
-        except BaseException as exc:
-            self.print_result("raise", exc)
-            raise
-        else:
-            self.print_result("return", ret, "->")
-            return ret
+        result()
+        line("->", repr(ret, "return" in self.abbrev))
+        return ret
+
+class Tracer(WrapperFunction):
+    def __init__(self, name, abbrev=()):
+        self.name = name
+        self.abbrev = abbrev
+    def __call__(self, *pos, **kw):
+        start()
+        print_call(self.name, pos, kw, abbrev=self.abbrev)
+        line()
+
+@contextmanager
+def checkpoint(text, abbrev=()):
+    start()
+    stderr.write(text)
+    with trace_exc(abbrev=abbrev):
+        yield
+    result()
+    line("done")
+
+@contextmanager
+def trace_exc(abbrev=()):
+    global indent
     
-    def print_result(self, key, v, disp=None):
-        global startline
-        global indent
-        
-        indent -= 1
-        
-        if disp is None:
-            disp = key
-        
-        if key in self.abbrev:
-            v = "..."
-        else:
-            v = repr(v)
-        if startline:
-            margin(stderr)
-        else:
-            stderr.write(" ")
-        print(disp, v, file=stderr)
-        startline = True
+    stderr.flush()
+    indent += 1
+    try:
+        yield
+    except BaseException as exc:
+        result()
+        line("raise", repr(exc, "raise" in abbrev))
+        raise
 
-def Tracer(name):
-    return traced(nop, name=name, abbrev=set(("return",)))
+def result():
+    global indent
+    indent -= 1
+    if midline:
+        stderr.write(" ")
+    else:
+        margin()
 
-def print_call(name, args, kw, abbrev=set()):
+def print_call(name, pos=(), kw=dict(), abbrev=()):
     print(name, end="(", file=stderr)
     
-    for (k, v) in enumerate(args):
+    for (k, v) in enumerate(pos):
         if k:
             stderr.write(", ")
-        if k in abbrev:
-            v = "..."
-        else:
-            v = repr(v)
-        stderr.write(v)
+        stderr.write(repr(v, k in abbrev))
     
-    comma = bool(args)
+    comma = pos
     for (k, v) in kw.items():
         if comma:
             stderr.write(", ")
-        if k in abbrev:
-            v = "..."
-        else:
-            v = repr(v)
-        stderr.write("{0}={1}".format(k, v))
+        stderr.write("{0}={1}".format(k, repr(v, k in abbrev)))
         comma = True
     
     stderr.write(")")
 
+def repr(v, abbrev=False):
+    if abbrev:
+        return "..."
+    else:
+        return reprlib.repr(v)
+
 indent = 0
-startline = True
+midline = False
 
-def margin(file):
+def start():
+    if midline:
+        line()
+    margin()
+
+def line(*pos, **kw):
+    global midline
+    print(*pos, file=stderr, **kw)
+    midline = False
+
+def margin():
+    global midline
     for _ in range(indent):
-        file.write("  ")
-
-def nop(*pos, **kw):
-    pass
+        stderr.write("  ")
+    midline = True

@@ -17,6 +17,7 @@ from sys import exc_info
 from sys import (displayhook, excepthook)
 from collections import deque
 from misc import WrapperFunction
+from functools import partial
 
 class generator(WrapperFunction):
     def __call__(self, *args, **kw):
@@ -54,7 +55,11 @@ class Thread(object):
         self.resume(*args, **kw)
     
     def resume(self, send=None, exc=None):
-        if exc is not None:
+        self.event = None  # Initialise attribute or mark as already closed
+        
+        if exc is None:
+            tb = None
+        else:
             try:
                 tb = exc.__traceback__
             except AttributeError:
@@ -64,12 +69,13 @@ class Thread(object):
         try:
             while self.routines:
                 current = self.routines[-1]
+                if exc:
+                    # Traceback from first parameter apparently ignored
+                    call = partial(current.throw, *exc)
+                else:
+                    call = partial(current.send, send)
                 try:
-                    if exc:
-                        # Traceback from first parameter apparently ignored
-                        obj = current.throw(*exc)
-                    else:
-                        obj = current.send(send)
+                    obj = call()
                 except BaseException as e:
                     self.routines.pop()
                     if isinstance(e, StopIteration):
@@ -80,8 +86,11 @@ class Thread(object):
                             send = None
                     else:
                         # Saving traceback creates circular reference
-                        # Remove our throw or send call from traceback
-                        tb = exc_info()[2].tb_next
+                        # Remove our throw or send call from traceback, but
+                        # only if there is more traceback
+                        (_, _, tb) = exc_info()
+                        if tb.tb_next:
+                            tb = tb.tb_next
                         if hasattr(e, "__traceback__"):
                             e.__traceback__ = tb
                         exc = (type(e), e, tb)
@@ -115,13 +124,14 @@ class Thread(object):
         
         finally:
             # Break circular reference if traceback includes this function
+            del tb
             del exc
     
     def close(self):
-        if self.routines:
+        if self.event:
             self.event.close()
-            while self.routines:
-                self.routines.pop().close()
+        while self.routines:
+            self.routines.pop().close()
     
     __del__ = close
     
