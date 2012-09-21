@@ -58,7 +58,23 @@ def options(self):
         mand_opt="emo", optzero="ozed", multi_opt=["mo1"], noarg_opt=True,
     ))
 
-# Test argument types
+@suite_add(suite)
+@testfunc()
+def types(self):
+    """Test argument types"""
+    fixture = Fixture()
+    fixture.f.param_types = dict(
+        {"*": float}, mand_opt=set, optzero=int, multi_opt=float)
+    command(fixture.f,
+        "-mand-opt=hallo -optzero -12 -multi-opt=inf -multi-opt=01.0e+01 "
+        "mand x x x -- 0 -1 +.625e-1".
+    split())
+    
+    self.assertEqual(fixture.values["mand"], "mand")
+    self.assertEqual(fixture.values["var"], (0, -1, 0.0625))
+    self.assertEqual(fixture.values["mand_opt"], set("halo"))
+    self.assertEqual(fixture.values["optzero"], -12)
+    self.assertEqual(fixture.values["multi_opt"], [float("inf"), 10])
 
 @suite_add(suite)
 @testfunc()
