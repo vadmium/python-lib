@@ -96,16 +96,17 @@ def command(func=None, args=None, param_types=dict()):
     positional = list()
     opts = dict()
     args = iter(args)
+    endopts = False
     while True:
         try:
             arg = next(args)
         except StopIteration:
             break
         if arg == "--":
-            positional.extend(args)
-            break
+            endopts = True
+            continue
         
-        if arg.startswith("-") and arg != "-":
+        if not endopts and arg.startswith("-") and arg != "-":
             # Allow options to be preceded by two dashes
             if arg.startswith("--"):
                 opt = arg[2:]
