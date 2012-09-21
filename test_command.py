@@ -30,10 +30,12 @@ def help(self):
     
     self.maxDiff = None
     self.assertEqual(capture.getvalue(), """\
+Summary line
+
 Parameters: [-mand] <str> [[-defnone] <str>] [-noarg | <str>] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
 Defaults: -multi=() -optzero=0 -multi-opt=frozenset()
 
-Test docstring
+Docstring body
 """)
 
 @suite_add(suite)
@@ -130,7 +132,10 @@ class Fixture(object):
         
         def func(mand, defnone=None, noarg=False, multi=(), *var,
         mand_opt, optzero=0, noarg_opt=False, multi_opt=frozenset()):
-            """Test docstring"""
+            """Summary line
+            
+            Docstring body"""
+            
             nonlocal self
             for name in self.params:
                 self.values[name] = vars()[name]

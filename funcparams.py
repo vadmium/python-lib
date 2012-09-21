@@ -179,9 +179,32 @@ def command(func=None, args=None, param_types=dict()):
 def help(func=None, file=stderr, param_types=dict()):
     (func, argspec, params, param_types, defaults) = inspect(
         func, param_types)
+    
+    doc = getdoc(func)
+    if doc is None:
+        summary = None
+        body = None
+    else:
+        lines = doc.split("\n", 2)
+        if len(lines) > 1 and lines[1]:  # 2nd line exists and is not blank
+            summary = None
+            body = doc
+        else:
+            summary = lines[0]
+            try:
+                body = lines[2]
+            except LookupError:
+                body = None
+    
+    if summary:
+        print(summary, file=file)
+    
     params = (params or
         argspec.varargs is not None or argspec.varkw is not None)
+    
     if params:
+        if summary:
+            print(file=file)
         file.write("Parameters:")
         print_params(argspec.args, file, defaults, param_types,
             normal="[-{param}] <{value}>",
@@ -222,11 +245,13 @@ def help(func=None, file=stderr, param_types=dict()):
         
         print(file=file)
     
-    doc = getdoc(func)
-    if doc is not None:
-        if params:
+    if body is not None:
+        if summary or params:
             print(file=file)
-        print(doc, file=file)
+        print(body, file=file)
+    
+    if not summary and not params and not body:
+        print("No parameters", file=file)
 
 def print_params(params, file, defaults, types, normal, noarg):
     for param in params:
