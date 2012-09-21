@@ -78,6 +78,15 @@ def types(self):
 
 @suite_add(suite)
 @testfunc()
+def type_names(self):
+    """Parameter name checking for "param_types" attribute"""
+    fixture = Fixture()
+    fixture.f.param_types = dict({"*": int}, optzero=int, invalid=int)
+    with self.assertRaises(TypeError):
+        command(fixture.f, "x -mand-opt=x".split())
+
+@suite_add(suite)
+@testfunc()
 def frozen(self):
     """Input parameters should not be modified"""
     
