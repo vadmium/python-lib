@@ -32,6 +32,13 @@ class Form(object):
 class ScrolledTree(Frame):
     def __init__(self, master, columns=1,
     tree=True, headings=True, resize=False):
+        """
+        columns: int, or len(columns): Number of columns; default: 1
+        iter(columns): Iterator of dict() objects; optional. Elements may
+            also be strings, equivalent to the "heading" value. Keys:
+                "heading": Optional
+                "width": Optional"""
+        
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)

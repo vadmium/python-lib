@@ -50,6 +50,7 @@ def nop(*args, **kw):
 
 FieldType = namedtuple("Field", "key, value")
 def Field(**kw):
+    """Sugary syntax for creating a (key, value) tuple"""
     (field,) = kw.items()
     return FieldType(*field)
 

@@ -1,13 +1,16 @@
 #coding=UTF-8
+
+"""Log function call details"""
+
 from __future__ import print_function
 
 from sys import stderr
 from misc import WrapperFunction
 from contextlib import contextmanager
 
-try:
+try:  # Python 3
     import reprlib
-except ImportError:  # Library renamed from Python 2
+except ImportError:  # Python < 3
     import repr as reprlib
 
 class traced(WrapperFunction):
