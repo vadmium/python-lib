@@ -18,6 +18,7 @@ import sys
 from collections import deque
 from misc import WrapperFunction
 from functools import partial
+from contextlib import contextmanager
 
 class Send(object):
     def __init__(self, value=None):
@@ -85,11 +86,8 @@ class Thread(object):
         self.result = join
         self.reapers = list()
         self.routines = [routine]
-        try:
+        with firedoor(self):
             self.resume(Send())
-        except:
-            self.close()
-            raise
     
     @weakmethod
     def wakeup(self, result=Send()):
@@ -341,3 +339,11 @@ class LockCascade(object):
             if not self.context.__exit__(*exc):
                 return False
         raise StopIteration(self.context)
+
+@contextmanager
+def firedoor(handle):
+    try:
+        yield
+    except:
+        handle.close()
+        raise
