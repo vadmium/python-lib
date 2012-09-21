@@ -1,12 +1,26 @@
+from __future__ import print_function
+
 import sys
 from collections import Set
 from inspect import getcallargs
 from inspect import getdoc
-from inspect import getfullargspec
 from sys import stderr
 from itertools import chain
 
-def command(func=None, args=None, *, param_types=dict()):
+try:
+    from inspect import getfullargspec
+except ImportError:
+    from inspect import getargspec
+    from collections import namedtuple
+    FullArgSpec = namedtuple("FullArgSpec", """
+        args, varargs, varkw, defaults,
+        kwonlyargs, kwonlydefaults, annotations""")
+    def getfullargspec(*pos, **kw):
+        argspec = getargspec(*pos, **kw)
+        return FullArgSpec(*argspec,
+            kwonlyargs=(), kwonlydefaults=None, annotations=None)
+
+def command(func=None, args=None, param_types=dict()):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
@@ -85,7 +99,7 @@ def command(func=None, args=None, *, param_types=dict()):
             if noarg_default(defaults.get(key)):
                 if arg is not None:
                     raise SystemExit("Option {opt!r} takes no argument".
-                        format_map(locals()))
+                        format(**locals()))
                 opts[opt] = True
             
             else:
@@ -94,7 +108,7 @@ def command(func=None, args=None, *, param_types=dict()):
                         arg = next(args)
                     except StopIteration:
                         raise SystemExit("Option {opt!r} requires an "
-                            "argument".format_map(locals()))
+                            "argument".format(**locals()))
                 
                 try:
                     convert = param_types[key]
@@ -134,7 +148,7 @@ def command(func=None, args=None, *, param_types=dict()):
     
     return func(*positional, **opts)
 
-def help(func=None, file=stderr, *, param_types=dict()):
+def help(func=None, file=stderr, param_types=dict()):
     (func, argspec, param_types, defaults) = inspect(func, param_types)
     params = (argspec.args or argspec.varargs is not None or
         argspec.kwonlyargs or argspec.varkw is not None)
@@ -151,8 +165,8 @@ def help(func=None, file=stderr, *, param_types=dict()):
             except LookupError:
                 pass
             else:
-                value = "{value}: {type.__name__}".format_map(locals())
-            file.write(" [<{value}> . . .]".format_map(locals()))
+                value = "{value}: {type.__name__}".format(**locals())
+            file.write(" [<{value}> . . .]".format(**locals()))
         print_params(argspec.kwonlyargs, file, defaults, param_types,
             normal="-{param}=<{value}>",
             noarg="-{param}",
@@ -160,7 +174,7 @@ def help(func=None, file=stderr, *, param_types=dict()):
         if argspec.varkw is not None:
             type = param_types.get("**", str).__name__
             file.write(
-                " [-{argspec.varkw}=<{type}> . . .]".format_map(locals()))
+                " [-{argspec.varkw}=<{type}> . . .]".format(**locals()))
         
         first = True
         for param in chain(argspec.args, argspec.kwonlyargs):
@@ -175,7 +189,7 @@ def help(func=None, file=stderr, *, param_types=dict()):
                 file.write("\n" "Defaults:")
                 first = False
             param = param.replace("_", "-")
-            file.write(" -{param}={default!s}".format_map(locals()))
+            file.write(" -{param}={default!s}".format(**locals()))
         
         print(file=file)
     
@@ -198,8 +212,8 @@ def print_params(params, file, defaults, types, normal, noarg):
             else:
                 format = normal
             if multi_default(default):
-                format = "{format} . . .".format_map(locals())
-            format = "[{format}]".format_map(locals())
+                format = "{format} . . .".format(**locals())
+            format = "[{format}]".format(**locals())
         param = param.replace("_", "-")
         file.writelines((" ", format.format(param=param, value=value)))
 

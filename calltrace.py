@@ -3,7 +3,10 @@ from __future__ import print_function
 
 from sys import stderr
 from misc import WrapperFunction
-from reprlib import repr
+try:
+    from reprlib import repr
+except ImportError:  # Library renamed from Python 2
+    from repr import repr
 
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
