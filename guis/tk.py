@@ -123,6 +123,8 @@ class Ttk(object):
                 new = self.widget.tree.next(focus)
                 if not new:
                     new = self.widget.tree.prev(focus)
+                if not new:
+                    new = self.widget.tree.parent(focus)
             else:
                 new = ""
             
@@ -152,6 +154,20 @@ class Ttk(object):
         
         def get(self, item):
             return self.widget.tree.item(item, option="values")
+    
+    class Tree(TreeBase):
+        def add(self, parent, text, *pos, **kw):
+            if not parent:
+                parent = ""
+            return Ttk.TreeBase.add(self, parent, *pos, text=text, **kw)
+        
+        def children(self, parent):
+            if not parent:
+                parent = ""
+            return self.widget.tree.get_children(parent)
+        
+        def set(self, item, text):
+            self.widget.tree.item(item, text=text)
     
     class MenuEntry(object):
         expand = True
