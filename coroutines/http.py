@@ -31,7 +31,7 @@ class HTTPConnection(object):
     def Request(self, method, hostname, path):
         yield self.sock.send(method.encode())
         yield self.sock.send(b" ")
-        for c in path.encode("UTF-8"):
+        for c in path.encode("utf-8"):
             if c <= ord(b" "):
                 yield self.sock.send(b"%{:02X}".format(c))
             else:
@@ -58,7 +58,7 @@ class HTTPConnection(object):
             #~ # simple-response
             
             try:
-                pre_space = (yield parser.space())
+                pre_space = yield parser.space()
             except ExcessError as e:
                 raise BadStatusLine(e.data)
             if parser.eol:
@@ -100,7 +100,7 @@ class HTTPConnection(object):
                     break
                 mid_space.extend(parser.c)
             try:
-                space = (yield parser.space())
+                space = yield parser.space()
             except ExcessError as e:
                 raise BadStatusLine(pre_space + pattern + major + b"." +
                     minor + mid_space + e.data)
@@ -145,33 +145,28 @@ class HTTPConnection(object):
                         reason.extend(parser.eol)
                 reason.extend(parser.c)
             else:
-                raise ExcessError("Excessive status reason")
+                raise ExcessError("Status reason of 400 or more characters")
             reason = reason.rstrip()
             
-            msg = (yield parser.headers())
+            msg = yield parser.headers()
             
             # pending = parser.c
         
         te = msg.get_all("Transfer-Encoding", [])
-        try:
-            last = te[-1]
-        except LookupError:
+        if not te:
             yield parser.after_eol()
             raise StopIteration(IdentityResponse(status, reason, msg,
                 self.sock, parser))
         
+        last = te.pop()
         # TODO: better parsing: eliminate null elements; check for "identity"
-        (*split, last) = last.rsplit(",", 1)
+        (prev, sep, last) = last.rpartition(",")
         if last.strip().lower() != "chunked":
             raise UnknownTransferEncoding("Not chunked transfer encoding")
         
         # Remove "chunked" from end of header value
-        try:
-            (split,) = split
-        except ValueError:
-            te.pop()
-        else:
-            te[-1] = split.rstrip()
+        if sep:
+            te.append(prev.rstrip())
         
         # Replace header fields back into message object
         del msg["Transfer-Encoding"]
@@ -184,7 +179,7 @@ class HTTPConnection(object):
 class HTTPResponse(object):
     def __init__(self, status, reason, msg):
         self.status = int(status)
-        self.reason = reason.decode("ISO-8859-1")
+        self.reason = reason.decode("latin-1")
         self.msg = msg
 
 class IdentityResponse(HTTPResponse):
@@ -203,7 +198,7 @@ class IdentityResponse(HTTPResponse):
     
     def read(self, amt):
         if self.data is None:
-            data = (yield self.sock.recv(min(self.size, amt)))
+            data = yield self.sock.recv(min(self.size, amt))
         else:
             data = self.data
             self.data = None
@@ -219,9 +214,9 @@ class ChunkedResponse(HTTPResponse):
     
     def read(self, amt):
         if self.size:
-            data = (yield self.sock.recv(min(self.size, amt)))
+            data = yield self.sock.recv(min(self.size, amt))
         else:
-            (self.size, data) = (yield self.chunks)
+            (self.size, data) = yield self.chunks
         self.size -= len(data)
         raise StopIteration(data)
     
@@ -246,14 +241,14 @@ class ChunkedResponse(HTTPResponse):
                     size = size * 16 + digit
                     yield parser.next_char()
                 else:
-                    raise ExcessError("Excessive chunk size")
+                    raise ExcessError("Chunk size of 30 or more digits")
                 yield parser.after_eol()
             
             i = 0
             while parser.eol is None:
                 i += 1
                 if i >= 3000:
-                    raise ExcessError("Excessive line")
+                    raise ExcessError("Line of 3000 or more characters")
                 yield self.next_char()
                 yield self.after_eol()
             
@@ -265,7 +260,7 @@ class ChunkedResponse(HTTPResponse):
             
             yield parser.next_char()
         else:
-            raise ExcessError("Excessive number of chunks")
+            raise ExcessError("30000 or more chunks")
         
         yield parser.headers()
 
@@ -301,7 +296,7 @@ class Parser(object):
             yield self.next_char()
             yield self.after_eol()
         else:
-            raise ExcessError("Excessive headers")
+            raise ExcessError("30000 or more headers")
     
     def space(self):
         """Read and skip over spaces
@@ -358,7 +353,7 @@ class Parser(object):
         return self.c.isspace() and self.c not in CRLF
     
     def next_char(self):
-        self.c = (yield self.sock.recv(1))
+        self.c = yield self.sock.recv(1)
 
 class ExcessError(EnvironmentError):
     def __init__(self, msg, data=None):
