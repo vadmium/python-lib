@@ -192,7 +192,7 @@ class IdentityResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        (self.size,) = self.msg.get_all("Content-Length", [])
+        (self.size,) = self.msg.get_all("Content-Length", ())
         self.size = int(self.size)
         if self.size:
             self.data = parser.c
