@@ -19,7 +19,8 @@ class Ttk(object):
         self.root.mainloop()
     
     class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, parent=None, *, title=None, sections):
+        def __init__(self, gui, parent=None, *,
+        title=None, sections, command=None):
             if parent:
                 self.window = Toplevel(parent.window)
             else:
@@ -34,6 +35,10 @@ class Ttk(object):
             top = font.metrics("linespace")
             side = font_size(font["size"])
             padding = font_size(font["size"] / 2)
+            
+            self.command = command
+            if self.command:
+                self.window.bind("<Return>", self.activate)
             
             focussed = False
             for section in sections:
@@ -86,6 +91,9 @@ class Ttk(object):
         
         def close(self):
             self.window.destroy()
+        
+        def activate(self, event):
+            self.command()
     
     class Entry(object):
         expand = True
