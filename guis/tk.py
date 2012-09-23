@@ -1,7 +1,8 @@
 from tkinter import Tk
-from tkinter.ttk import (Button, Entry, Frame, LabelFrame)
+from tkinter.ttk import (Button, Entry, Frame, LabelFrame, OptionMenu)
 import tkinter
 from tkinter.filedialog import (askopenfilename, asksaveasfilename)
+from tkinter import StringVar
 from tkinter import Toplevel
 from tkwrap import ScrolledTree
 from tkinter.font import nametofont
@@ -186,6 +187,24 @@ class Ttk(object):
         
         def __iter__(self):
             return iter(self.widget.tree.get_children())
+    
+    class MenuEntry(object):
+        expand = True
+        
+        def __init__(self, menu, value):
+            self.menu = menu
+            self.value = value
+        
+        def place_on(self, window, master, focus, resize=False):
+            self.var = StringVar()
+            self.widget = OptionMenu(master, self.var, self.value,
+                *self.menu)
+            if focus:
+                self.widget.focus_set()
+                return True
+        
+        def get(self):
+            return self.var.get()
     
     class Layout(object):
         def __init__(self, cells):
