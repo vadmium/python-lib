@@ -4,6 +4,7 @@ from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
 from itertools import cycle
+from tkinter import getboolean
 
 class Form(object):
     def __init__(self, master, column=0):
@@ -108,8 +109,27 @@ class ScrolledTree(Frame):
             width = max(width, self.tree.column(key, option="minwidth"))
             stretch = value.get("stretch", False)
             self.tree.column(key, stretch=stretch, width=width)
+        
+        self.tree.bind("<End>", self.end)
+    
     EM = "\N{EM SPACE}"
     FIGURE = "\N{FIGURE SPACE}"
+    
+    def end(self, event):
+        item = ""
+        while True:
+            children = self.tree.get_children(item)
+            if not children:
+                break
+            item = children[-1]
+            
+            # Sometimes the "open" option is the integer 0; other times it is
+            # a Tcl_Obj() with a string value of "true" or "false"!
+            if not getboolean(str(self.tree.item(item, option="open"))):
+                break
+        self.tree.focus(item)
+        self.tree.selection_set((item,))
+        self.tree.see(item)
     
     def columns(self):
         if self.tree_shown:
