@@ -10,7 +10,6 @@ from tkwrap import font_size
 from tkwrap import Form
 from . import InnerClass
 from . import label_key
-from collections import (Mapping, Iterable)
 
 class Ttk(object):
     def __init__(self):
@@ -21,7 +20,7 @@ class Ttk(object):
     
     class Window(object, metaclass=InnerClass):
         def __init__(self, gui, parent=None, *,
-        title=None, sections, command=None):
+        contents, title=None, command=None):
             if parent:
                 self.window = Toplevel(parent.window)
             else:
@@ -29,8 +28,6 @@ class Ttk(object):
             
             if title is not None:
                 self.window.title(title)
-            
-            form = Form(self.window, column=1)
             
             font = nametofont("TkDefaultFont")
             top = font.metrics("linespace")
@@ -41,54 +38,8 @@ class Ttk(object):
             if self.command:
                 self.window.bind("<Return>", self.activate)
             
-            focussed = False
-            for section in sections:
-                if not isinstance(section, Iterable):
-                    focussed |= bool(section.place_on(self, form.master,
-                        not focussed))
-                    section.widget.grid(columnspan=4)
-                    continue
-                
-                access = section.get("access")
-                label = convert_label(section["label"], access)
-                group = LabelFrame(form.master, **label)
-                (_, group_row) = form.master.size()
-                group.grid(
-                    column=form.column - 1, columnspan=4,
-                    sticky=tkinter.NSEW,
-                    padx=padding, pady=(0, padding),
-                )
-                
-                for field in section["fields"]:
-                    if isinstance(field, Mapping):
-                        target = field["field"]
-                    else:
-                        target = field
-                    focussed |= bool(target.place_on(self, form.master,
-                        not focussed))
-                    multiline = getattr(target, "multiline", False)
-                    
-                    if isinstance(field, Mapping):
-                        kw = convert_label(field["label"], field.get("access"))
-                        if multiline:
-                            kw["multiline"] = True
-                        form.add_field(target.widget, **kw)
-                    else:
-                        sticky = [tkinter.EW]
-                        if multiline:
-                            sticky.append(tkinter.NS)
-                        target.widget.grid(column=form.column, columnspan=2,
-                            sticky=sticky)
-                        if multiline:
-                            row = target.widget.grid_info()["row"]
-                            form.master.rowconfigure(row, weight=1)
-                
-                (_, rows) = form.master.size()
-                group.grid(rowspan=rows + 1 - group_row)
-                form.master.rowconfigure(group_row, minsize=top)
-                form.master.columnconfigure(form.column - 1, minsize=side)
-                form.master.columnconfigure(form.column + 2, minsize=side)
-                form.master.rowconfigure(rows, minsize=side)
+            contents.place_on(self, self.window, focus=True)
+            contents.widget.pack(fill=tkinter.BOTH, expand=True)
         
         def close(self):
             self.window.destroy()
@@ -225,6 +176,44 @@ class Ttk(object):
                 if all_expand or getattr(cell, "expand", False):
                     self.widget.columnconfigure(col, weight=1)
             return focussed
+    
+    class Form(object):
+        def __init__(self, *fields):
+            self.fields = fields
+        
+        def place_on(self, window, master, focus):
+            self.widget = Frame(master)
+            form = Form(self.widget)
+            
+            focussed = False
+            for field in self.fields:
+                if isinstance(field, Ttk.Field):
+                    target = field.field
+                else:
+                    target = field
+                focussed |= bool(target.place_on(window, form.master,
+                    not focussed))
+                multiline = getattr(target, "multiline", False)
+                
+                if isinstance(field, Ttk.Field):
+                    kw = convert_label(field.label, field.access)
+                    if multiline:
+                        kw["multiline"] = True
+                    form.add_field(target.widget, **kw)
+                else:
+                    sticky = [tkinter.EW]
+                    if multiline:
+                        sticky.append(tkinter.NS)
+                    target.widget.grid(columnspan=2, sticky=sticky)
+                    if multiline:
+                        row = target.widget.grid_info()["row"]
+                        form.master.rowconfigure(row, weight=1)
+    
+    class Field(object):
+        def __init__(self, label, field, access=None):
+            self.label = label
+            self.field = field
+            self.access = access
     
     def file_browse(self, mode, parent=None, *,
     title=None, types, file=None):
