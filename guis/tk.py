@@ -79,20 +79,28 @@ class Ttk(object):
                 self.focus_set()
                 return True
     
-    class List(object):
+    class TreeBase(object):
         multiline = True
         
-        def __init__(self, headings, selected=None):
+        def __init__(self, headings=1, selected=None, opened=None):
+            """
+            headings: Sequence of column headings; default: single unnamed
+                column"""
+            
             self.headings = headings
             self.selected = selected
+            self.opened = opened
         
-        def place_on(self, window, master, focus=False):
-            self.widget = ScrolledTree(master, tree=False,
-                columns=self.headings)
+        def place_on(self, window, master, focus=False, **kw):
+            self.widget = ScrolledTree(master, columns=self.headings, **kw)
             
             if self.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
                 self.widget.bind_select(self.select)
+            if self.opened:
+                self.widget.tree.bind("<<TreeviewOpen>>", self.open)
+            if window.command:
+                self.widget.tree.bind("<Double-1>", window.activate)
             
             if focus:
                 self.widget.tree.focus_set()
@@ -101,12 +109,13 @@ class Ttk(object):
         def clear(self):
             return self.widget.tree.delete(*self.widget.tree.get_children())
         
-        def add(self, columns, selected=False):
-            item = self.widget.add(values=columns)
+        def add(self, *pos, selected=False, **kw):
+            item = self.widget.add(*pos, **kw)
             if selected:
                 # Empty selection returns empty string?!
                 selection = tuple(self.widget.tree.selection())
                 self.widget.tree.selection_set(selection + (item,))
+            return item
         
         def remove(self, item):
             focus = self.widget.tree.focus()
@@ -122,17 +131,27 @@ class Ttk(object):
             if new:
                 self.widget.tree.focus(new)
         
-        def get(self, item):
-            return self.widget.tree.item(item, option="values")
-        
         def selection(self):
             return self.widget.tree.selection()
         
         def select(self, event):
             self.selected()
         
+        def open(self, event):
+            self.opened(self.widget.tree.focus())
+        
         def __iter__(self):
             return iter(self.widget.tree.get_children())
+    
+    class List(TreeBase):
+        def place_on(self, *pos, **kw):
+            return Ttk.TreeBase.place_on(self, *pos, tree=False, **kw)
+        
+        def add(self, columns, *pos, **kw):
+            return Ttk.TreeBase.add(self, *pos, values=columns, **kw)
+        
+        def get(self, item):
+            return self.widget.tree.item(item, option="values")
     
     class MenuEntry(object):
         expand = True
