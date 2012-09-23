@@ -33,7 +33,7 @@ class Ttk(object):
             if self.command:
                 self.window.bind("<Return>", self.activate)
             
-            contents.place_on(self, self.window, focus=True)
+            contents.place_on(self, self.window, focus=True, resize=True)
             contents.widget.pack(fill=tkinter.BOTH, expand=True)
         
         def close(self):
@@ -48,7 +48,7 @@ class Ttk(object):
         def __init__(self, value=None):
             self.value = value
         
-        def place_on(self, window, master, focus=False):
+        def place_on(self, window, master, focus=False, resize=False):
             self.widget = Entry(master)
             if self.value:
                 self.widget.insert(0, self.value)
@@ -71,7 +71,7 @@ class Ttk(object):
                 self.kw.update(command=command)
             self.kw.update(convert_label(label, access))
         
-        def place_on(self, window, master, focus=False):
+        def place_on(self, window, master, focus=False, resize=False):
             self.widget = Button(master, **self.kw)
             if self.disabled:
                 self.widget.state(("disabled",))
@@ -92,8 +92,9 @@ class Ttk(object):
             self.selected = selected
             self.opened = opened
         
-        def place_on(self, window, master, focus=False, **kw):
-            self.widget = ScrolledTree(master, columns=self.headings, **kw)
+        def place_on(self, window, master, focus=False, resize=False, **kw):
+            self.widget = ScrolledTree(master, columns=self.headings,
+                resize=resize, **kw)
             
             if self.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
@@ -194,14 +195,15 @@ class Ttk(object):
         def __init__(self, *cells):
             self.cells = cells
         
-        def place_on(self, window, master, focus):
+        def place_on(self, window, master, focus, resize=False):
             focussed = False
             self.widget = Frame(master)
             all_expand = not any(getattr(cell, "expand", False)
                 for cell in self.cells)
             for (col, cell) in enumerate(self.cells):
+                resize_this = resize and col == len(self.cells)
                 focussed |= bool(cell.place_on(window, self.widget,
-                    not focussed and focus))
+                    not focussed and focus, resize_this))
                 sticky = list()
                 if getattr(cell, "expand", False):
                     sticky.append(tkinter.EW)
@@ -222,7 +224,7 @@ class Ttk(object):
                     depth = max(depth, 1 + self.get_depth(field.fields))
             return depth
         
-        def place_on(self, window, master, focus):
+        def place_on(self, window, master, focus, resize=False):
             self.widget = Frame(master)
             form = Form(self.widget, column=self.depth)
             
