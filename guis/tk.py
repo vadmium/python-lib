@@ -206,8 +206,8 @@ class Ttk(object):
         def get(self):
             return self.var.get()
     
-    class Layout(object):
-        def __init__(self, cells):
+    class Inline(object):
+        def __init__(self, *cells):
             self.cells = cells
         
         def place_on(self, window, master, focus):
