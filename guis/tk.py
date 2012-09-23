@@ -226,6 +226,10 @@ class Ttk(object):
         if not file:
             return None
         return file
+    
+    def EventDriver(self):
+        from eventgen.tk import Driver
+        return Driver(self.root)
 
 def convert_label(label, key=None):
     label = label_key(label, key)
