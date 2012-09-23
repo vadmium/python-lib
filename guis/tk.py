@@ -38,7 +38,7 @@ class Ttk(object):
             focussed = False
             for section in sections:
                 if not isinstance(section, Iterable):
-                    focussed |= bool(section.place_on(form.master,
+                    focussed |= bool(section.place_on(self, form.master,
                         not focussed))
                     section.widget.grid(columnspan=4)
                     continue
@@ -58,7 +58,7 @@ class Ttk(object):
                         target = field["field"]
                     else:
                         target = field
-                    focussed |= bool(target.place_on(form.master,
+                    focussed |= bool(target.place_on(self, form.master,
                         not focussed))
                     multiline = getattr(target, "multiline", False)
                     
@@ -93,7 +93,7 @@ class Ttk(object):
         def __init__(self, value=None):
             self.value = value
         
-        def place_on(self, master, focus=False):
+        def place_on(self, window, master, focus=False):
             self.widget = Entry(master)
             if self.value:
                 self.widget.insert(0, self.value)
@@ -116,7 +116,7 @@ class Ttk(object):
                 self.kw.update(command=command)
             self.kw.update(convert_label(label, access))
         
-        def place_on(self, master, focus=False):
+        def place_on(self, window, master, focus=False):
             self.widget = Button(master, **self.kw)
             if self.disabled:
                 self.widget.state(("disabled",))
@@ -131,7 +131,7 @@ class Ttk(object):
             self.headings = headings
             self.selected = selected
         
-        def place_on(self, master, focus=False):
+        def place_on(self, window, master, focus=False):
             self.widget = ScrolledTree(master, tree=False,
                 columns=self.headings)
             
@@ -183,13 +183,13 @@ class Ttk(object):
         def __init__(self, cells):
             self.cells = cells
         
-        def place_on(self, master, focus):
+        def place_on(self, window, master, focus):
             focussed = False
             self.widget = Frame(master)
             all_expand = not any(getattr(cell, "expand", False)
                 for cell in self.cells)
             for (col, cell) in enumerate(self.cells):
-                focussed |= bool(cell.place_on(self.widget,
+                focussed |= bool(cell.place_on(window, self.widget,
                     not focussed and focus))
                 sticky = list()
                 if getattr(cell, "expand", False):
