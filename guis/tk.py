@@ -32,6 +32,7 @@ class Ttk(object):
             self.command = command
             if self.command:
                 self.window.bind("<Return>", self.activate)
+            self.window.bind("<Escape>", self.escape)
             
             contents.place_on(self, self.window, focus=True, resize=True)
             contents.widget.pack(fill=tkinter.BOTH, expand=True)
@@ -41,6 +42,8 @@ class Ttk(object):
         
         def activate(self, event):
             self.command()
+        def escape(self, event):
+            self.close()
     
     class Entry(object):
         expand = True
@@ -64,20 +67,38 @@ class Ttk(object):
             self.widget.insert(0, text)
     
     class Button(object):
-        def __init__(self, label, command=None, access=None):
+        def __init__(self, label, command=None, access=None,
+        default=False, close=False):
+            if default:
+                command = self.default
+            elif close:
+                command = self.close
+            
+            self.default = default
+            self.close = close
             self.kw = dict()
             self.disabled = command is None
             if not self.disabled:
                 self.kw.update(command=command)
             self.kw.update(convert_label(label, access))
+            if self.default:
+                self.kw.update(default="active")
         
         def place_on(self, window, master, focus=False, resize=False):
+            self.window = window
             self.widget = Button(master, **self.kw)
             if self.disabled:
                 self.widget.state(("disabled",))
             if focus:
                 self.focus_set()
                 return True
+        
+        def default(self):
+            if self.window.command:
+                self.window.command()
+        
+        def close(self):
+            self.window.close()
     
     class TreeBase(object):
         multiline = True
