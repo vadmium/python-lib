@@ -14,10 +14,54 @@ http://www.weightless.io/
 import weakref
 from misc import weakmethod
 from sys import exc_info
-from sys import (displayhook, excepthook)
+import sys
 from collections import deque
 from misc import WrapperFunction
 from functools import partial
+from contextlib import contextmanager
+from traceback import extract_stack
+
+class Send(object):
+    def __init__(self, value=None):
+        self.value = value
+    def result(self):
+        return self.value
+    def sendcall(self, gen):
+        return partial(gen.send, self.value)
+    def genresult(self):
+        return StopIteration(self.value)
+    def default(self):
+        sys.displayhook(self.value)
+
+class Throw(object):
+    def __init__(self, *exc):
+        try:
+            (exc,) = exc
+        except ValueError:
+            self.exc = list(exc)
+        else:
+            self.exc = [type(exc), exc, getattr(exc, "__traceback__", None)]
+    
+    def with_traceback(self, tb):
+        try:
+            self.exc[1].with_traceback(tb)
+        except AttributeError:
+            pass
+        self.exc[2] = tb
+        return self
+    
+    def result(self):
+        #~ # Hack to include traceback in Python 2:
+        #~ raise self.exc[0], self.exc[1], self.exc[2]
+        raise self.exc[1]
+    def sendcall(self, gen):
+        # Traceback from first parameter apparently ignored
+        return partial(gen.throw, *self.exc)
+    def genresult():
+        #~ self.result()  # Python 2 hack
+        return self.exc[1]
+    def default(self):
+        sys.excepthook(*self.exc)
 
 class generator(WrapperFunction):
     def __call__(self, *args, **kw):
@@ -43,57 +87,37 @@ class Thread(object):
         self.result = join
         self.reapers = list()
         self.routines = [routine]
-        try:
-            self.resume()
-        except:
-            self.close()
-            raise
+        with firedoor(self):
+            self.resume(Send())
     
     @weakmethod
-    def wakeup(self, *args, **kw):
+    def wakeup(self, result=Send()):
         self.event.close()
-        self.resume(*args, **kw)
+        self.resume(result)
     
-    def resume(self, send=None, exc=None):
+    def resume(self, result):
+        tb = None  # For seamless deletion at end
         self.event = None  # Initialise attribute or mark as already closed
-        
-        if exc is None:
-            tb = None
-        else:
-            try:
-                tb = exc.__traceback__
-            except AttributeError:
-                tb = None
-            exc = (type(exc), exc, tb)
         
         try:
             while self.routines:
-                current = self.routines[-1]
-                if exc:
-                    # Traceback from first parameter apparently ignored
-                    call = partial(current.throw, *exc)
-                else:
-                    call = partial(current.send, send)
+                call = result.sendcall(self.routines[-1])
                 try:
                     obj = call()
                 except BaseException as e:
                     self.routines.pop()
                     if isinstance(e, StopIteration):
-                        exc = None
-                        if e.args:
-                            send = e.args[0]
-                        else:
-                            send = None
+                        result = Send(*e.args)
                     else:
                         # Saving traceback creates circular reference
+                        result = Throw(*exc_info())
+                        
                         # Remove our throw or send call from traceback, but
                         # only if there is more traceback
-                        (_, _, tb) = exc_info()
-                        if tb.tb_next:
-                            tb = tb.tb_next
-                        if hasattr(e, "__traceback__"):
-                            e.__traceback__ = tb
-                        exc = (type(e), e, tb)
+                        tb = result.exc[2].tb_next
+                        if tb:
+                            result.with_traceback(tb)
+                
                 else:
                     if isinstance(obj, Event):
                         self.event = obj
@@ -101,35 +125,27 @@ class Thread(object):
                         return
                     elif isinstance(obj, Yield):
                         self.routines.pop()
-                        exc = None
-                        send = obj.send
+                        result = Send(obj.send)
                     else:
                         self.routines.append(obj)
-                        exc = None
-                        send = None
+                        result = Send()
             
             if self.result:
-                if exc:
-                    self.result = exc
-                else:
-                    self.result = (None, StopIteration(send), None)
+                self.result = result
             else:
-                if exc:
-                    excepthook(*exc)
-                else:
-                    displayhook(send)
-            
+                result.default()
             for r in self.reapers:
                 r()
         
         finally:
             # Break circular reference if traceback includes this function
             del tb
-            del exc
+            del result
     
     def close(self):
         if self.event:
             self.event.close()
+            self.event = None
         while self.routines:
             self.routines.pop().close()
     
@@ -142,13 +158,21 @@ class Thread(object):
             yield r
         
         if self.result:
-            raise self.result[1]
-            
-            #~ # Alternative for Python 2, to include traceback
-            #~ raise self.result[0], self.result[1], self.result[2]
+            raise self.result.genresult()
     
     def __repr__(self):
         return "<{0} {1:#x}>".format(type(self).__name__, id(self))
+    
+    def extract_stack(self, limit=None):
+        stack = list()
+        for routine in reversed(self.routines):
+            new = extract_stack(routine.gi_frame, limit=limit)
+            if limit is not None:
+                limit -= len(new)
+            stack = new + stack
+            if limit is not None and not limit:
+                break
+        return stack
 
 class Event(object):
     """Base class that an event generator can yield to wait for events"""
@@ -175,7 +199,7 @@ class Callback(Event):
         Any arguments passed to the callback are yielded from the event as a
         tuple
         """
-        self.callback(args)
+        self.callback(Send(args))
 
 class Queue(Event):
     """An event that may be triggered before it is armed (message queue)
@@ -260,8 +284,10 @@ class Subevent(object):
         self.event = event
     
     @weakmethod
-    def trigger(self, send=None, **kw):
-        self.set().callback((self.event, send), **kw)
+    def trigger(self, result=Send()):
+        if not isinstance(result, Throw):
+            result = Send((self.event, result.result()))
+        self.set().callback(result)
 
 class FileEvent(Event):
     def __init__(self, fd):
@@ -325,3 +351,11 @@ class LockCascade(object):
             if not self.context.__exit__(*exc):
                 return False
         raise StopIteration(self.context)
+
+@contextmanager
+def firedoor(handle):
+    try:
+        yield
+    except:
+        handle.close()
+        raise

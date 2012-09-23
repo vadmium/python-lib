@@ -1,14 +1,8 @@
-from functools import partial
-from functools import reduce
-from operator import or_
-from math import ceil
-import eventgen
 import tkinter
 from tkinter.ttk import (Frame, Label, Scrollbar)
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
-from collections import namedtuple
 from itertools import cycle
 
 class Form(object):
@@ -161,67 +155,3 @@ def font_size(size):
         return -size
     else:
         return "{size}p".format_map(locals())
-
-# Another potential API implementation
-if False:
-    from types import MethodType
-    class MethodClass(type):
-        def __get__(self, obj, cls):
-            if obj is None:
-                return self
-            return MethodType(self, obj)
-    class EventDriver(object):
-        def __init__(self, widget):
-            self.widget = widget
-        class FileEvent(..., metaclass=MethodClass):
-            def __init__(self, parent, *_, **__):
-                ...(parent.widget)
-            ...
-        ...
-
-def EventDriver(widget):
-    # Create subclasses with "widget" as a member that inherit from the
-    # driver classes defined below
-    return EventDriverType(
-        FileEvent=type("EventDriver.FileEvent", (FileEvent,), locals()),
-        Timer=type("EventDriver.Timer", (Timer,), locals()),
-    )
-EventDriverType = namedtuple(EventDriver.__name__, "FileEvent, Timer")
-
-class FileEvent(eventgen.FileEvent):
-    from tkinter import (READABLE as READ, WRITABLE as WRITE)
-    
-    def __init__(self, *args, **kw):
-        self.tk = self.widget.tk
-        eventgen.FileEvent.__init__(self, *args, **kw)
-    
-    def watch(self, ops):
-        self.ops = reduce(or_, ops)
-    
-    def arm(self, *args, **kw):
-        eventgen.FileEvent.arm(self, *args, **kw)
-        self.tk.createfilehandler(self.fd, self.ops, self.handler)
-    
-    def close(self, *args, **kw):
-        self.tk.deletefilehandler(self.fd)
-        eventgen.FileEvent.close(self, *args, **kw)
-    
-    def handler(self, fd, mask):
-        if self.callback is not None:
-            return self.callback((fd, set(op for op in
-                (self.READ, self.WRITE) if mask & op)))
-
-class Timer(eventgen.Event):
-    def __init__(self):
-        eventgen.Event.__init__(self)
-        self.timer = None
-    
-    def start(self, timeout):
-        self.timer = self.widget.after(ceil(timeout * 1000), self.handler)
-    
-    def stop(self):
-        self.widget.after_cancel(self.timer)
-    
-    def handler(self):
-        if self.callback is not None:
-            return self.callback()
