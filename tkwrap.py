@@ -1,5 +1,5 @@
 import tkinter
-from tkinter.ttk import (Frame, Label, Scrollbar)
+from tkinter.ttk import (Frame, Label, Scrollbar, Sizegrip)
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
@@ -28,7 +28,8 @@ class Form(object):
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
 class ScrolledTree(Frame):
-    def __init__(self, master, columns=1, tree=True, headings=True):
+    def __init__(self, master, columns=1,
+    tree=True, headings=True, resize=False):
         Frame.__init__(self, master)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
@@ -60,6 +61,10 @@ class ScrolledTree(Frame):
             command=self.tree.xview)
         scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
         self.tree.configure(xscrollcommand=scroll.set)
+        
+        if resize:
+            resize = Sizegrip(self)
+            resize.grid(row=1, column=1, sticky=(tkinter.EW, tkinter.NS))
         
         self.heading_font = nametofont("TkHeadingFont")
         self.heading_space = "\N{EN QUAD}"
