@@ -5,6 +5,7 @@ from tkinter.font import nametofont
 from math import ceil
 from itertools import cycle
 from tkinter import getboolean
+from collections import (Sequence, Iterable)
 
 class Form(object):
     def __init__(self, master, column=0):
@@ -38,8 +39,12 @@ class ScrolledTree(Frame):
         try:
             self.nontree_columns = len(columns)
         except TypeError:
-            self.nontree_columns = columns
-            columns = cycle((dict(),))
+            if isinstance(columns, Iterable):
+                columns = tuple(columns)
+                self.nontree_columns = len(columns)
+            else:
+                self.nontree_columns = columns
+                columns = cycle((dict(),))
         
         show = list()
         self.tree_shown = tree
@@ -138,6 +143,8 @@ class ScrolledTree(Frame):
             yield column
     
     def add(self, parent="", *args, **kw):
+        if not isinstance(kw.get("values", ()), Sequence):
+            kw["values"] = tuple(kw["values"])
         child = self.tree.insert(parent, "end", *args, **kw)
         if not self.tree.focus():
             self.tree.focus(child)
