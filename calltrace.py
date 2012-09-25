@@ -15,7 +15,10 @@ class traced(WrapperFunction):
         WrapperFunction.__init__(self, func)
         if name is None:
             try:
-                self.name = func.__name__
+                try:
+                    self.name = func.__qualname__
+                except AttributeError:
+                    self.name = func.__name__
             except AttributeError:
                 self.name = reprlib.repr(func)
             else:
