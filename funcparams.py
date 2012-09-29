@@ -20,6 +20,34 @@ except ImportError:
         return FullArgSpec(*argspec,
             kwonlyargs=(), kwonlydefaults=None, annotations=None)
 
+try:
+    from collections import ChainMap
+except ImportError:
+    from collections import Mapping
+    class ChainMap(Mapping):
+        def __init__(self, *maps):
+            self.maps = maps
+        
+        def __getitem__(self, key):
+            for map in self.maps:
+                try:
+                    return map.__getitem__(key)
+                except LookupError:
+                    continue
+            else:
+                raise KeyError(key)
+        
+        def __iter__(self):
+            keys = set()
+            for map in self.maps:
+                for key in map:
+                    if key not in keys:
+                        keys.add(key)
+                        yield key
+        
+        def __len__(self):
+            return len(frozenset().union(*self.maps))
+
 def command(func=None, args=None, param_types=dict()):
     """Invokes a function using CLI arguments
     
@@ -231,9 +259,7 @@ def inspect(func, param_types):
     if argspec.kwonlydefaults is not None:
         defaults.update(argspec.kwonlydefaults)
     
-    for (param, type) in getattr(func, "param_types", dict()):
-        param_types.setdefault(param, type)
-    
+    param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
     return (func, argspec, param_types, defaults)
 
 # Infer parameter modes from default values
