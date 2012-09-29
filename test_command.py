@@ -59,6 +59,22 @@ def options(self):
     ))
 
 # Test argument types
+
+@suite_add(suite)
+@testfunc()
+def frozen(self):
+    """Input parameters should not be modified"""
+    
+    def f(a, b):
+        pass
+    f.param_types = dict(a=int)
+    
+    args = "7 42".split()
+    param_types = dict(b=int)
+    command(f, args, param_types=param_types)
+    self.assertEqual(args, "7 42".split())
+    self.assertEqual(param_types, dict(b=int))
+
 # Test variable arguments
 # Test variable keyword arguments
 # Test __main__.main and argv defaults
