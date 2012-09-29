@@ -52,3 +52,7 @@ FieldType = namedtuple("Field", "key, value")
 def Field(**kw):
     (field,) = kw.items()
     return FieldType(*field)
+
+def itemkey(item):
+    (key, value) = item
+    return key
