@@ -32,7 +32,7 @@ def help(self):
     self.assertEqual(capture.getvalue(), """\
 Summary line
 
-Parameters: [-mand] <str> [[-defnone] <str>] [-noarg | <str>] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
+Parameters: [-mand] <str> [[-defnone] <str>] [-noarg] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
 Defaults: -multi=() -optzero=0 -multi-opt=frozenset()
 
 Docstring body

@@ -211,7 +211,7 @@ def help(func=None, file=stderr, param_types=dict()):
         file.write("Parameters:")
         print_params(argspec.args, file, defaults, param_types,
             normal="[-{param}] <{value}>",
-            noarg="-{param} | <{value}>",
+            noarg="-{param}",
         )
         if argspec.varargs is not None:
             value = argspec.varargs
