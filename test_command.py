@@ -5,6 +5,7 @@ from io import StringIO
 from unittest import (TestCase, TestSuite)
 from misc import deco_factory
 from funcparams import command
+import funcparams
 
 @deco_factory
 def suite_add(suite, Test):
@@ -25,8 +26,7 @@ def help(self):
     """Test help works and everything that is meant to be there is there"""
     
     capture = StringIO()
-    from funcparams import help
-    help(Fixture().f, capture)
+    funcparams.help(Fixture().f, capture)
     
     self.maxDiff = None
     self.assertEqual(capture.getvalue(), """\
@@ -84,6 +84,15 @@ def type_names(self):
     fixture.f.param_types = dict({"*": int}, optzero=int, invalid=int)
     with self.assertRaises(TypeError):
         command(fixture.f, "x -mand-opt=x".split())
+
+@suite_add(suite)
+@testfunc()
+def nodoc(self):
+    """Help should work without any docstring"""
+    
+    def f():
+        pass
+    funcparams.help(f, StringIO())
 
 @suite_add(suite)
 @testfunc()
