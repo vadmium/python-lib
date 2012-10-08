@@ -130,6 +130,7 @@ class Thread(object):
     def close(self):
         if self.event:
             self.event.close()
+            self.event = None
         while self.routines:
             self.routines.pop().close()
     
