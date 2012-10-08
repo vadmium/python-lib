@@ -28,8 +28,10 @@ class WrapperFunction(Function):
     from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
     def __init__(self, wrapped, assigned=WRAPPER_ASSIGNMENTS, *args, **kw):
         self.update_wrapper(wrapped, assigned, *args, **kw)
-        if not hasattr(self, "__wrapped__"):  # Python 2 does not add this
-            self.__wrapped__ = wrapped
+        
+        # Python 2 does not add this, and Python 3 overwrites it with
+        # wrapped.__wrapped__ when updating self.__dict__
+        self.__wrapped__ = wrapped
         
         # Python 2 cannot assign these unless they are guaranteed to exist
         for name in {"__defaults__", "__code__"}.difference(assigned):
