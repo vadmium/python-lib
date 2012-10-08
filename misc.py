@@ -4,7 +4,6 @@ from os.path import basename
 import os
 from types import MethodType
 from functools import partial
-from contextlib import closing
 
 try:
     from urllib.parse import (urlsplit, urlunsplit)
@@ -142,14 +141,13 @@ class Context(object):
     def __enter__(self):
         return self
     def __exit__(self, *exc):
-        return False
+        self.close()
 
-class CloseAll(closing):
+class CloseAll(Context):
     def __init__(self):
-        closing.__init__(self, self)
         self.set = []
     
-    def close(self, *exc):
+    def close(self):
         while self.set:
             self.set.pop().close()
     
