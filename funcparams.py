@@ -237,7 +237,8 @@ def help(func=None, file=stderr, param_types=dict()):
                 default = defaults[param]
             except LookupError:
                 continue
-            if default is None or noarg_default(default):
+            if (default is None or
+            noarg_default(default) or multi_default(default)):
                 continue
             
             if first:
@@ -311,4 +312,4 @@ def inspect(func, param_types):
 def noarg_default(default):
     return default is False
 def multi_default(default):
-    return isinstance(default, (tuple, list, Set))
+    return isinstance(default, (tuple, list, Set)) and not default

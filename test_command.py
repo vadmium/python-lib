@@ -33,7 +33,7 @@ def help(self):
 Summary line
 
 Parameters: [-mand] <str> [[-defnone] <str>] [-noarg] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
-Defaults: -multi=() -optzero=0 -multi-opt=frozenset()
+Defaults: -optzero=0
 
 Docstring body
 """)
