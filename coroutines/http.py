@@ -44,6 +44,8 @@ class HTTPConnection(object):
             b"Host: "
         )
         yield self.sock.send(hostname.encode())
+        # User-Agent: python-event-http
+        # X-Forwarded-For: . . .
         yield self.sock.send(b"\r\n"
             b"\r\n"
         )
