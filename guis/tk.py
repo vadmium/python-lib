@@ -81,6 +81,7 @@ class Ttk(object):
     
     class TreeBase(object):
         multiline = True
+        expand = True
         
         def __init__(self, headings=1, selected=None, opened=None):
             """
@@ -188,6 +189,8 @@ class Ttk(object):
             return self.var.get()
     
     class Inline(object):
+        expand = True
+        
         def __init__(self, *cells):
             self.cells = cells
         
@@ -271,7 +274,9 @@ class Ttk(object):
                         kw["multiline"] = True
                     form.add_field(target.widget, **kw)
                 else:
-                    sticky = [tkinter.EW]
+                    sticky = list()
+                    if getattr(target, "expand", False):
+                        sticky.append(tkinter.EW)
                     if multiline:
                         sticky.append(tkinter.NS)
                     span = (self.depth - level) * 2 + 2
