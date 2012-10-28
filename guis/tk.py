@@ -29,11 +29,6 @@ class Ttk(object):
             if title is not None:
                 self.window.title(title)
             
-            font = nametofont("TkDefaultFont")
-            top = font.metrics("linespace")
-            side = font_size(font["size"])
-            padding = font_size(font["size"] / 2)
-            
             self.command = command
             if self.command:
                 self.window.bind("<Return>", self.activate)
@@ -180,19 +175,59 @@ class Ttk(object):
     class Form(object):
         def __init__(self, *fields):
             self.fields = fields
+            self.depth = self.get_depth(self.fields)
+        
+        def get_depth(self, fields):
+            depth = 0
+            for field in fields:
+                if isinstance(field, Ttk.Section):
+                    depth = max(depth, 1 + self.get_depth(field.fields))
+            return depth
         
         def place_on(self, window, master, focus):
             self.widget = Frame(master)
-            form = Form(self.widget)
+            form = Form(self.widget, column=self.depth)
             
+            if self.depth:
+                font = nametofont("TkDefaultFont")
+                self.top = font.metrics("linespace")
+                self.side = font_size(font["size"])
+                self.padding = font_size(font["size"] / 2)
+                for level in range(self.depth):
+                    form.master.columnconfigure(level, minsize=self.side)
+                    col = self.depth * 2 + 2 - level - 1
+                    form.master.columnconfigure(col, minsize=self.side)
+            
+            return self.place_fields(self.fields, window, form, 0, focus)
+        
+        def place_fields(self, fields, window, form, level, focus):
             focussed = False
-            for field in self.fields:
+            for field in fields:
+                if isinstance(field, Ttk.Section):
+                    group = LabelFrame(form.master, **field.label)
+                    (_, group_row) = form.master.size()
+                    span = (self.depth - level) * 2 + 2
+                    group.grid(
+                        column=level, columnspan=span,
+                        sticky=tkinter.NSEW,
+                        padx=self.padding, pady=(0, self.padding),
+                    )
+                    
+                    focussed |= bool(self.place_fields(field.fields, window,
+                        form, level + 1, not focussed and focus))
+                    
+                    (_, rows) = form.master.size()
+                    group.grid(rowspan=rows + 1 - group_row)
+                    form.master.rowconfigure(group_row, minsize=self.top)
+                    form.master.rowconfigure(rows, minsize=self.side)
+                    continue
+                
                 if isinstance(field, Ttk.Field):
                     target = field.field
                 else:
                     target = field
                 focussed |= bool(target.place_on(window, form.master,
-                    not focussed))
+                    not focussed and focus))
                 multiline = getattr(target, "multiline", False)
                 
                 if isinstance(field, Ttk.Field):
@@ -204,11 +239,19 @@ class Ttk(object):
                     sticky = [tkinter.EW]
                     if multiline:
                         sticky.append(tkinter.NS)
-                    target.widget.grid(columnspan=2, sticky=sticky)
+                    span = (self.depth - level) * 2 + 2
+                    target.widget.grid(column=level, columnspan=span,
+                        sticky=sticky)
                     if multiline:
                         row = target.widget.grid_info()["row"]
                         form.master.rowconfigure(row, weight=1)
+            
+            return focussed
     
+    class Section(object):
+        def __init__(self, label, *fields, access=None):
+            self.fields = fields
+            self.label = convert_label(label, access)
     class Field(object):
         def __init__(self, label, field, access=None):
             self.label = label
