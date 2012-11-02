@@ -19,7 +19,7 @@ class Function(object):
     def __init__(self):
         # By default, name the function after its class
         self.__name__ = type(self).__name__
-    def __get__(self, obj, cls):
+    def __get__(self, obj, cls=None):
         if obj is None:
             return self
         return MethodType(self, obj)
@@ -45,6 +45,13 @@ class WrapperFunction(Function):
             self.__kwdefaults__ = wrapped.__kwdefaults__
         except AttributeError:
             pass
+    
+    def __get__(self, *pos, **kw):
+        binding = self.__wrapped__.__get__(*pos, **kw)
+        if binding is self.__wrapped__:
+            return self
+        else:
+            return type(binding)(self, binding.__self__)
 
 class deco_factory(WrapperFunction):
     """Decorator to create a decorator factory given a function taking the
@@ -72,19 +79,26 @@ class weakmethod(object):
         if obj is None:
             return self
         return WeakBinding(self.func, obj)
-class WeakBinding(Function):
+class WeakBinding(object):
     def __init__(self, func, obj):
-        self.func = func
+        self.__func__ = func
         self.ref = weakref.ref(obj)
-    def __call__(self, *args, **kw):
+    
+    @property
+    def __self__(self):
         obj = self.ref()
         if obj is None:
-            raise ReferenceError("dead weakly-bound method {0} called".
-                format(self.func))
-        return self.func.__get__(obj, type(obj))(*args, **kw)
+            raise ReferenceError("weakly bound instance to method {0!r} "
+                "no longer exists".format(self.__func__))
+        return obj
+    
+    def __call__(self, *args, **kw):
+        obj = self.__self__
+        return self.__func__.__get__(obj, type(obj))(*args, **kw)
+    
     def __repr__(self):
         return "<{0} of {1} to {2}>".format(
-            type(self).__name__, self.func, self.ref())
+            type(self).__name__, self.__func__, self.ref())
 
 def gen_repr(gi):
     f = gi.gi_frame
