@@ -275,8 +275,8 @@ class Any(Event):
         Event.close(self)
     
     def __repr__(self):
-        return "<{0}([{1}])>".format(
-            type(self).__name__, ", ".join(str(e.event) for e in self.set))
+        return "{0}({1})".format(
+            type(self).__name__, repr(self.set))
 
 class Subevent(object):
     def __init__(self, set, event):
