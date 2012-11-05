@@ -20,6 +20,7 @@ from misc import WrapperFunction
 from functools import partial
 from contextlib import contextmanager
 from traceback import extract_stack
+from warnings import warn
 
 class Send(object):
     def __init__(self, value=None):
@@ -149,7 +150,10 @@ class Thread(object):
         while self.routines:
             self.routines.pop().close()
     
-    __del__ = close
+    def __del__(self):
+        if self.routines:
+            warn(ResourceWarning("Thread {0!r} left running".format(self)))
+            self.close()
     
     def join(self):
         if self.routines:
