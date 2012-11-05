@@ -4,6 +4,8 @@ from math import ceil
 from . import (FileEvent as BaseFileEvent, Event)
 from collections import namedtuple
 from . import Send
+from misc import weakmethod
+from warnings import warn
 
 # Another potential API implementation
 if False:
@@ -63,6 +65,14 @@ class Timer(Event):
     
     def stop(self):
         self.widget.after_cancel(self.timer)
+        self.timer = None
     
+    @weakmethod
     def handler(self):
         return self.callback()
+    
+    def __del__(self):
+        if self.timer:
+            warn(ResourceWarning("Timer {0!r} left running".format(self)),
+                stacklevel=2)
+            self.stop()

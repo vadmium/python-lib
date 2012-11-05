@@ -71,8 +71,10 @@ def resolve(event_driver, name, family=AF_UNSPEC):
             timer.start(timeout)
             events.add(timer)
         
-        (trigger, args) = (yield events)
-        timer.stop()
+        try:
+            (trigger, args) = (yield events)
+        finally:
+            timer.stop()
         
         if trigger is timer:
             ops = ()
