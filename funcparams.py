@@ -210,8 +210,8 @@ def help(func=None, file=stderr, param_types=dict()):
             print(file=file)
         file.write("Parameters:")
         print_params(argspec.args, file, defaults, param_types,
-            normal="[-{param}] <{value}>",
-            noarg="-{param}",
+            normal="[{param}] <{value}>",
+            noarg="{param}",
         )
         if argspec.varargs is not None:
             value = argspec.varargs
@@ -223,13 +223,13 @@ def help(func=None, file=stderr, param_types=dict()):
                 value = "{value}: {type.__name__}".format(**locals())
             file.write(" [<{value}> . . .]".format(**locals()))
         print_params(argspec.kwonlyargs, file, defaults, param_types,
-            normal="-{param}=<{value}>",
-            noarg="-{param}",
+            normal="{param}=<{value}>",
+            noarg="{param}",
         )
         if argspec.varkw is not None:
             type = param_types.get("**", str).__name__
-            file.write(
-                " [-{argspec.varkw}=<{type}> . . .]".format(**locals()))
+            file.write(" [{}=<{}> . . .]".format(
+                option(argspec.varkw), type))
         
         first = True
         for param in chain(argspec.args, argspec.kwonlyargs):
@@ -244,8 +244,7 @@ def help(func=None, file=stderr, param_types=dict()):
             if first:
                 file.write("\n" "Defaults:")
                 first = False
-            param = param.replace("_", "-")
-            file.write(" -{param}={default!s}".format(**locals()))
+            file.write(" {}={!s}".format(option(param), default))
         
         print(file=file)
     
@@ -272,8 +271,16 @@ def print_params(params, file, defaults, types, normal, noarg):
             if multi_default(default):
                 format = "{format} . . .".format(**locals())
             format = "[{format}]".format(**locals())
-        param = param.replace("_", "-")
+        
+        param = option(param)
         file.writelines((" ", format.format(param=param, value=value)))
+
+def option(param):
+    param = param.replace("_", "-")
+    if param.startswith("-"):
+        return "--" + param
+    else:
+        return "-" + param
 
 def inspect(func, param_types):
     if func is None:
