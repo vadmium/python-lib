@@ -104,17 +104,19 @@ class Ttk(object):
         multiline = True
         expand = True
         
-        def __init__(self, headings=1, selected=None, opened=None):
+        def __init__(self, columns=1, selected=None, opened=None):
             """
-            headings: Sequence of column headings; default: single unnamed
+            columns: Sequence of dict() objects for each column, or column
+                headings. Keys can be "text" and "width". Width is measured
+                in digits (U+2007 "Figure space"). Default: single unnamed
                 column"""
             
-            self.headings = headings
+            self.columns = columns
             self.selected = selected
             self.opened = opened
         
         def place_on(self, window, master, focus=False, resize=False, **kw):
-            self.widget = ScrolledTree(master, columns=self.headings,
+            self.widget = ScrolledTree(master, columns=self.columns,
                 resize=resize, **kw)
             
             if self.selected:
