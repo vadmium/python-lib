@@ -80,6 +80,7 @@ class weakmethod(object):
         if obj is None:
             return self
         return WeakBinding(self.func, obj)
+
 class WeakBinding(object):
     def __init__(self, func, obj):
         self.__func__ = func

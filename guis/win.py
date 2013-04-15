@@ -73,8 +73,6 @@ class Win(object):
             
             if parent:
                 parent = parent.hwnd
-            else:
-                parent = None
             
             self.init_exc = None
             try:

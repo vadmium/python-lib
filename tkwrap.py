@@ -192,4 +192,4 @@ def font_size(size):
     if size < 0:
         return -size
     else:
-        return "{size}p".format_map(locals())
+        return "{}p".format(size)

@@ -2,9 +2,9 @@ from misc import Function
 
 def probe():
     try:
-        from . win import Win
+        from .win import Win
     except ImportError:
-        from . tk import Ttk
+        from .tk import Ttk
         return Ttk()
     return Win()
 
