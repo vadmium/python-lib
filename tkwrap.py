@@ -113,7 +113,7 @@ class ScrolledTree(Frame):
                 try:
                     (width, unit) = width
                 except TypeError:
-                    unit = self.EM
+                    unit = self.FIGURE
                 width *= self.text_font.measure(unit)
                 width += self.space_size
             
@@ -124,7 +124,6 @@ class ScrolledTree(Frame):
         
         self.tree.bind("<End>", self.end)
     
-    EM = "\N{EM SPACE}"
     FIGURE = "\N{FIGURE SPACE}"
     
     def end(self, event):
