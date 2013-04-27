@@ -42,7 +42,7 @@ class traced(WrapperFunction):
         line("->", repr(ret, "return" in self.abbrev))
         return ret
 
-class Tracer(WrapperFunction):
+class tracer(WrapperFunction):
     def __init__(self, name, abbrev=()):
         self.name = name
         self.abbrev = abbrev
