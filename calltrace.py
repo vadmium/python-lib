@@ -5,11 +5,22 @@ from __future__ import print_function
 from sys import stderr
 from misc import (WrapperFunction, Function)
 from contextlib import contextmanager
+import inspect
+from types import (
+    FunctionType, MethodType, BuiltinFunctionType, BuiltinMethodType,
+    ModuleType, GeneratorType,
+)
 
 try:  # Python 3
     import reprlib
 except ImportError:  # Python < 3
     import repr as reprlib
+
+try:  # Python < 3
+    from types import (InstanceType, ClassType)
+except ImportError:  # Python 3
+    InstanceType = object
+    ClassType = type
 
 class traced(WrapperFunction):
     def __init__(self, func, abbrev=set()):
@@ -27,7 +38,7 @@ class traced(WrapperFunction):
     
     def __repr__(self):
         return "{0.__class__.__name__}({1})".format(
-            self, funcname(self.name))
+            self, custrepr(self.__wrapped__))
 
 class tracer(Function):
     def __init__(self, name, abbrev=()):
@@ -92,13 +103,113 @@ def optrepr(v, abbrev=False):
         return custrepr(v)
 
 def custrepr(obj):
-    aRepr = reprlib.Repr()
-    aRepr.maxother = max(aRepr.maxother, 80)
+    return Repr().repr(obj)
+
+class OrderedSubclasses(dict):
+    """Adds a "subclasses" list in topological order to each value"""
     
-    # "maxstring" used for "old-style" instances
-    aRepr.maxstring = max(aRepr.maxstring, 80)
+    def __init__(self, universe):
+        self.universe = universe
+        self.superclasses = set()
+        for cls in self.universe:
+            self[cls]
     
-    return aRepr.repr(obj)
+    def __missing__(self, cls):
+        self.superclasses.add(cls)
+        subclasses = list()
+        for subclass in self.universe:
+            if subclass == cls or not issubclass(subclass, cls):
+                continue
+            if subclass in self.superclasses:
+                raise ValueError("{0!r} is both a subclass and a superclass "
+                    "of {1!r}".format(subclass, cls))
+            existing = set(subclasses)
+            for subclass in self[subclass]:
+                if subclass not in existing:
+                    subclasses.append(subclass)
+        self.superclasses.remove(cls)
+        subclasses.append(cls)
+        self[cls] = subclasses
+        return subclasses
+
+class Repr(reprlib.Repr):
+    def __init__(self, *pos, **kw):
+        reprlib.Repr.__init__(self, *pos, **kw)
+        
+        self.maxother = max(self.maxother, 80)
+        if InstanceType is not object:
+            # "maxstring" used for "old-style" instances
+            self.maxstring = max(self.maxstring, 80)
+    
+    def repr1(self, obj, level):
+        """See if a custom repr() is provided that overrides the object's
+        repr()"""
+        
+        self.level = level
+        
+        for base in inspect.getmro(getattr(obj, "__class__", type(obj))):
+            # Check for subclasses of the object's base class, so that a
+            # custom representation of a virtual base class not in the MRO
+            # has priority over a common concrete base class's representation
+            for subclass in self.subclasses.get(base, ()):
+                if isinstance(obj, subclass):
+                    return self.classes[subclass](self, obj)
+            
+            # Let an object's specialised repr() have priority over custom
+            # representations for more basic classes
+            if vars(base).get("__repr__"):
+                return reprlib.Repr.repr1(self, obj, level)
+        
+        if isinstance(obj, InstanceType):
+            return self.obj(obj)
+        return reprlib.Repr.repr1(self, obj, level)
+    
+    def recurse(self, obj):
+        return self.repr1(obj, self.level - 1)
+    
+    classes = dict()
+    
+    def obj(self, obj):
+        """Mimic object representation printed by the garbage collector"""
+        return "<{0} 0x{1:X}>".format(self.recurse(obj.__class__), id(obj))
+    classes[object] = obj
+    
+    def named(self, obj):
+        name = getattr(obj, "__qualname__", obj.__name__)
+        if False:
+            module = getattr(obj, "__module__", None)
+            if module is not None:
+                name = "{0}.{1}".format(module, name)
+        return name
+    classes[FunctionType] = named
+    classes[type] = named
+    classes[ClassType] = named
+    
+    def method(self, method):
+        binding = method.__self__ or getattr(method, "im_class", None)
+        if binding:
+            return "{0}.{1.__func__.__name__}".format(
+                self.recurse(binding), method)
+        else:
+            return self.recurse(method.__func__)
+    classes[MethodType] = method
+    
+    def builtin(self, builtin):
+        binding = builtin.__self__
+        # Built-in functions tend to set __self__ to their module
+        if binding and (not isinstance(binding, ModuleType) or
+        binding.__name__ != builtin.__module__):
+            return "{0}.{1.__name__}".format(self.recurse(binding), builtin)
+        else:
+            return self.named(builtin)
+    classes[BuiltinFunctionType] = builtin
+    classes[BuiltinMethodType] = builtin
+    
+    def generator(self, gen):
+        return "<{0} 0x{1:X}>".format(self.named(gen), id(gen))
+    classes[GeneratorType] = generator
+    
+    subclasses = OrderedSubclasses(classes.keys())
 
 indent = 0
 midline = False
