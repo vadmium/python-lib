@@ -22,7 +22,7 @@ class traced(WrapperFunction):
         with trace_exc(abbrev=self.abbrev):
             ret = self.__wrapped__(*args, **kw)
         result()
-        line("->", repr(ret, "return" in self.abbrev))
+        line("->", optrepr(ret, "return" in self.abbrev))
         return ret
     
     def __repr__(self):
@@ -57,7 +57,7 @@ def trace_exc(abbrev=()):
         yield
     except BaseException as exc:
         result()
-        line("raise", repr(exc, "raise" in abbrev))
+        line("raise", optrepr(exc, "raise" in abbrev))
         raise
 
 def result():
@@ -74,22 +74,31 @@ def print_call(func, pos=(), kw=dict(), abbrev=()):
     for (k, v) in enumerate(pos):
         if k:
             stderr.write(", ")
-        stderr.write(repr(v, k in abbrev))
+        stderr.write(optrepr(v, k in abbrev))
     
     comma = pos
     for (k, v) in kw.items():
         if comma:
             stderr.write(", ")
-        stderr.write("{0}={1}".format(k, repr(v, k in abbrev)))
+        stderr.write("{0}={1}".format(k, optrepr(v, k in abbrev)))
         comma = True
     
     stderr.write(")")
 
-def repr(v, abbrev=False):
+def optrepr(v, abbrev=False):
     if abbrev:
         return "..."
     else:
-        return reprlib.repr(v)
+        return custrepr(v)
+
+def custrepr(obj):
+    aRepr = reprlib.Repr()
+    aRepr.maxother = max(aRepr.maxother, 80)
+    
+    # "maxstring" used for "old-style" instances
+    aRepr.maxstring = max(aRepr.maxstring, 80)
+    
+    return aRepr.repr(obj)
 
 indent = 0
 midline = False
