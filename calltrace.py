@@ -16,21 +16,7 @@ except ImportError:  # Python < 3
 class traced(WrapperFunction):
     def __init__(self, func, name=None, abbrev=set()):
         WrapperFunction.__init__(self, func)
-        if name is None:
-            try:
-                try:
-                    self.name = func.__qualname__
-                except AttributeError:
-                    self.name = func.__name__
-            except AttributeError:
-                self.name = reprlib.repr(func)
-            else:
-                if "import" not in abbrev:
-                    module = getattr(func, "__module__", None)
-                    if module is not None:
-                        self.name = "{0}.{1}".format(module, self.name)
-        else:
-            self.name = name
+        self.name = name or self.__wrapped__
         self.abbrev = abbrev
     
     def __call__(self, *args, **kw):
@@ -41,6 +27,10 @@ class traced(WrapperFunction):
         result()
         line("->", repr(ret, "return" in self.abbrev))
         return ret
+    
+    def __repr__(self):
+        return "{0.__class__.__name__}({1})".format(
+            self, funcname(self.name))
 
 class tracer(WrapperFunction):
     def __init__(self, name, abbrev=()):
@@ -81,8 +71,8 @@ def result():
     else:
         margin()
 
-def print_call(name, pos=(), kw=dict(), abbrev=()):
-    print(name, end="(", file=stderr)
+def print_call(func, pos=(), kw=dict(), abbrev=()):
+    print(funcname(func, abbrev), end="(", file=stderr)
     
     for (k, v) in enumerate(pos):
         if k:
@@ -97,6 +87,17 @@ def print_call(name, pos=(), kw=dict(), abbrev=()):
         comma = True
     
     stderr.write(")")
+
+def funcname(func, abbrev=()):
+    if isinstance(func, str):
+        return func
+    else:
+        name = getattr(func, "__qualname__", func.__name__)
+        if "import" not in abbrev:
+            module = getattr(func, "__module__", None)
+            if module is not None:
+                name = "{0}.{1}".format(module, name)
+        return name
 
 def repr(v, abbrev=False):
     if abbrev:
