@@ -5,16 +5,6 @@ import os
 from types import MethodType
 from functools import partial
 
-try:
-    from urllib.parse import (urlsplit, urlunsplit)
-except ImportError:
-    from urlparse import (urlsplit, urlunsplit)
-
-try:
-    from io import SEEK_CUR
-except ImportError:
-    SEEK_CUR = 1
-
 class Function(object):
     def __init__(self, name=None):
         # By default, name the function after its class
@@ -53,6 +43,73 @@ class WrapperFunction(Function):
             return self
         else:
             return type(binding)(self, binding.__self__)
+
+def wrap_import():
+    global installed_wrapper
+    if installed_wrapper:
+        return
+    wrapper = ImportWrapper(__import__)
+    wrapper("builtins").__import__ = wrapper
+    installed_wrapper = wrapper
+
+installed_wrapper = None
+
+class ImportWrapper(WrapperFunction):
+    fixups = dict()
+    
+    def __init__(self, *pos, **kw):
+        WrapperFunction.__init__(self, *pos, **kw)
+        self.interested = set(self.fixups.keys())
+    
+    def __call__(self, name, globals={}, locals={}, fromlist=None,
+    level=None):
+        if level is None or level <= 0:
+            path = name.split(".")
+            for i in range(len(path)):
+                self.fix(".".join(path[:i + 1]), globals, locals, level=0)
+            
+            for attr in fromlist or ():
+                attr = "{}.{}".format(name, attr)
+                self.fix(attr, globals, locals, level=0)
+        
+        # Actual default value of "level" changed in Python 3
+        if level is None:
+            return self.__wrapped__(name, globals, locals, fromlist)
+        else:
+            return self.__wrapped__(name, globals, locals, fromlist, level)
+    
+    def fix(self, name, *pos, **kw):
+        if name not in self.interested:
+            return
+        self.interested.remove(name)
+        self.fixups[name](self, *pos, **kw)
+    
+    @partial(fixups.__setitem__, "builtins")
+    def _(self, *pos, **kw):
+        try:
+            self.__wrapped__("builtins", *pos, **kw)
+        except ImportError:
+            builtin = self.__wrapped__("__builtin__", *pos, **kw)
+            sys.modules["builtins"] = builtin
+    
+    @partial(fixups.__setitem__, "io")
+    def _(self, *pos, **kw):
+        io = self.__wrapped__("io", *pos, **kw)
+        if not hasattr(io, "SEEK_CUR"):
+            io.SEEK_CUR = self.__wrapped__("os", *pos, **kw).SEEK_CUR
+    
+    @partial(fixups.__setitem__, "urllib.parse")
+    def _(self, *pos, **kw):
+        try:
+            urllib = self.__wrapped__("urllib.parse", *pos, **kw)
+        except ImportError:
+            urlparse = self.__wrapped__("urlparse", *pos, **kw)
+            sys.modules["urllib"].parse = urlparse
+            sys.modules["urllib.parse"] = urlparse
+
+wrap_import()
+
+from urllib.parse import (urlsplit, urlunsplit)
 
 class deco_factory(WrapperFunction):
     """Decorator to create a decorator factory given a function taking the
