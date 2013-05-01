@@ -5,8 +5,8 @@ import cares
 from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
 
-def name_connect(event_driver, hostname, port, Socket,
-callback=None, message=None):
+def name_connect(event_driver, address, Socket, callback=None, message=None):
+    hostname = address[0]
     if message is not None:
         callback = MessageCallback(message)
     
@@ -24,11 +24,12 @@ callback=None, message=None):
         
         sock = Socket(hostent.addrtype)
         try:
-            for addr in hostent.addr_list:
+            for attempt in hostent.addr_list:
+                attempt = (attempt,) + address[1:]
                 if callback is not None:
-                    callback.connecting(addr, port)
+                    callback.connecting(attempt)
                 try:
-                    yield sock.connect((addr, port))
+                    yield sock.connect(attempt)
                 except EnvironmentError as e:
                     print(e, file=stderr)
                     continue
@@ -53,8 +54,8 @@ class MessageCallback(object):
         self.callback = callback
     def lookingup(self, name, family):
         self.callback("Looking up {0} (family {1})".format(name, family))
-    def connecting(self, addr, port):
-        self.callback("Connecting to {0}:{1}".format(addr, port))
+    def connecting(self, address):
+        self.callback("Connecting to {0}:{1}".format(*address))
 
 def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(event_driver)
