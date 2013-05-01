@@ -48,7 +48,8 @@ class WrapperFunction(Function):
     
     def __get__(self, *pos, **kw):
         binding = self.__wrapped__.__get__(*pos, **kw)
-        if binding is self.__wrapped__:
+        # Avoid Python 2's unbound methods, with __self__ = None
+        if binding is self.__wrapped__ or binding.__self__ is None:
             return self
         else:
             return type(binding)(self, binding.__self__)
