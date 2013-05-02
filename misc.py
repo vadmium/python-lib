@@ -16,9 +16,9 @@ except ImportError:
     SEEK_CUR = 1
 
 class Function(object):
-    def __init__(self):
+    def __init__(self, name=None):
         # By default, name the function after its class
-        self.__name__ = type(self).__name__
+        self.__name__ = name or type(self).__name__
     def __get__(self, obj, cls=None):
         if obj is None:
             return self

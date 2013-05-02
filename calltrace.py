@@ -34,11 +34,11 @@ class traced(WrapperFunction):
 
 class tracer(WrapperFunction):
     def __init__(self, name, abbrev=()):
-        self.name = name
+        Function.__init__(self, name)
         self.abbrev = abbrev
     def __call__(self, *pos, **kw):
         start()
-        print_call(self.name, pos, kw, abbrev=self.abbrev)
+        print_call(self.__name__, pos, kw, abbrev=self.abbrev)
         line()
 
 @contextmanager
