@@ -1,11 +1,9 @@
-#coding=UTF-8
-
 """Log function call details"""
 
 from __future__ import print_function
 
 from sys import stderr
-from misc import WrapperFunction
+from misc import (WrapperFunction, Function)
 from contextlib import contextmanager
 
 try:  # Python 3
@@ -14,14 +12,13 @@ except ImportError:  # Python < 3
     import repr as reprlib
 
 class traced(WrapperFunction):
-    def __init__(self, func, name=None, abbrev=set()):
+    def __init__(self, func, abbrev=set()):
         WrapperFunction.__init__(self, func)
-        self.name = name or self.__wrapped__
         self.abbrev = abbrev
     
     def __call__(self, *args, **kw):
         start()
-        print_call(self.name, args, kw, self.abbrev)
+        print_call(custrepr(self.__wrapped__), args, kw, self.abbrev)
         with trace_exc(abbrev=self.abbrev):
             ret = self.__wrapped__(*args, **kw)
         result()
@@ -32,7 +29,7 @@ class traced(WrapperFunction):
         return "{0.__class__.__name__}({1})".format(
             self, funcname(self.name))
 
-class tracer(WrapperFunction):
+class tracer(Function):
     def __init__(self, name, abbrev=()):
         Function.__init__(self, name)
         self.abbrev = abbrev
@@ -72,7 +69,7 @@ def result():
         margin()
 
 def print_call(func, pos=(), kw=dict(), abbrev=()):
-    print(funcname(func, abbrev), end="(", file=stderr)
+    print(func, end="(", file=stderr)
     
     for (k, v) in enumerate(pos):
         if k:
@@ -87,17 +84,6 @@ def print_call(func, pos=(), kw=dict(), abbrev=()):
         comma = True
     
     stderr.write(")")
-
-def funcname(func, abbrev=()):
-    if isinstance(func, str):
-        return func
-    else:
-        name = getattr(func, "__qualname__", func.__name__)
-        if "import" not in abbrev:
-            module = getattr(func, "__module__", None)
-            if module is not None:
-                name = "{0}.{1}".format(module, name)
-        return name
 
 def repr(v, abbrev=False):
     if abbrev:
