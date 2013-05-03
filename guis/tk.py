@@ -8,8 +8,10 @@ from tkwrap import ScrolledTree
 from tkinter.font import nametofont
 from tkwrap import font_size
 import tkwrap
-from . import InnerClass
-from . import label_key
+from functools import partial
+from . import (Form, Section, Field, Inline)
+from . import (Entry, Button, List, Tree, MenuEntry)
+from . import stash
 
 class Ttk(object):
     def __init__(self):
@@ -18,173 +20,155 @@ class Ttk(object):
     def msg_loop(self):
         self.root.mainloop()
     
-    class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, parent=None, *,
-        contents, title=None, command=None):
-            if parent:
-                self.window = Toplevel(parent.window)
-            else:
-                self.window = gui.root
-            
-            if title is not None:
-                self.window.title(title)
-            
-            self.command = command
-            if self.command:
-                self.window.bind("<Return>", self.activate)
-            self.window.bind("<Escape>", self.escape)
-            
-            contents.place_on(self, self.window, focus=True, resize=True)
-            contents.widget.pack(fill=tkinter.BOTH, expand=True)
+    def new_window(self, win, parent=None, *,
+    contents, title=None, command=None):
+        if parent:
+            win.window = Toplevel(parent.window)
+        else:
+            win.window = self.root
         
-        def close(self):
-            self.window.destroy()
+        if title is not None:
+            win.window.title(title)
         
-        def activate(self, event):
-            self.command()
-        def escape(self, event):
-            self.close()
+        win.command = command
+        if win.command:
+            win.window.bind("<Return>", partial(self.activate, win))
+        win.window.bind("<Escape>", partial(self.escape, win))
+        
+        place = self.controls[type(contents)].init
+        place(self, contents, win, win.window, focus=True, resize=True)
+        contents.widget.pack(fill=tkinter.BOTH, expand=True)
     
+    def close_window(self, win):
+        win.window.destroy()
+    
+    def activate(self, win, event):
+        win.command()
+    def escape(self, win, event):
+        win.close()
+    
+    controls = dict()
+    
+    @stash(controls.__setitem__, Entry)
     class Entry(object):
-        expand = True
-        
-        def __init__(self, value=None):
-            self.value = value
-        
-        def place_on(self, window, master, focus=False, resize=False):
-            self.widget = ttk.Entry(master)
-            if self.value:
-                self.widget.insert(0, self.value)
+        def init(gui, ctrl, window, master, focus=False, resize=False):
+            ctrl.place(gui)
+            ctrl.widget = ttk.Entry(master)
+            if ctrl.value:
+                ctrl.widget.insert(0, ctrl.value)
             if focus:
-                self.widget.focus_set()
+                ctrl.widget.focus_set()
                 return True
         
-        def get(self):
-            return self.widget.get()
+        def get(gui, ctrl):
+            return ctrl.widget.get()
         
-        def set(self, text):
-            self.widget.delete(0, tkinter.END)
-            self.widget.insert(0, text)
+        def set(gui, ctrl, text):
+            ctrl.widget.delete(0, tkinter.END)
+            ctrl.widget.insert(0, text)
     
+    @stash(controls.__setitem__, Button)
     class Button(object):
-        def __init__(self, label, command=None, access=None,
-        default=False, close=False):
-            if default:
-                command = self.default
-            elif close:
-                command = self.close
+        def init(gui, ctrl, window, master, focus=False, resize=False):
+            if ctrl.default:
+                command = partial(ctrl.default, window)
+            elif ctrl.close:
+                command = partial(ctrl.close, window)
+            else:
+                command = ctrl.command
             
-            self.default = default
-            self.close = close
-            self.kw = dict()
-            self.disabled = command is None
-            if not self.disabled:
-                self.kw.update(command=command)
-            self.kw.update(convert_label(label, access))
-            if self.default:
-                self.kw.update(default="active")
-        
-        def place_on(self, window, master, focus=False, resize=False):
-            self.window = window
-            self.widget = ttk.Button(master, **self.kw)
-            if self.disabled:
-                self.widget.state(("disabled",))
+            disabled = command is None
+            kw = dict()
+            if not disabled:
+                kw.update(command=command)
+            kw.update(convert_label(ctrl))
+            if ctrl.default:
+                kw.update(default="active")
+            
+            ctrl.widget = ttk.Button(master, **kw)
+            if disabled:
+                ctrl.widget.state(("disabled",))
             if focus:
-                self.focus_set()
+                ctrl.widget.focus_set()
                 return True
-        
-        def default(self):
-            if self.window.command:
-                self.window.command()
-        
-        def close(self):
-            self.window.close()
     
     class TreeBase(object):
-        multiline = True
-        expand = True
-        
-        def __init__(self, columns=1, selected=None, opened=None):
-            """
-            columns: Sequence of dict() objects for each column, or column
-                headings. Keys can be "text" and "width". Width is measured
-                in digits (U+2007 "Figure space"). Default: single unnamed
-                column"""
-            
-            self.columns = columns
-            self.selected = selected
-            self.opened = opened
-        
-        def place_on(self, window, master, focus=False, resize=False, **kw):
-            self.widget = ScrolledTree(master, columns=self.columns,
+        def init(gui, ctrl, window, master, focus=False, resize=False,
+        **kw):
+            ctrl.place(gui)
+            ctrl.widget = ScrolledTree(master, columns=ctrl.columns,
                 resize=resize, **kw)
             
-            if self.selected:
+            if ctrl.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
-                self.widget.bind_select(self.select)
-            if self.opened:
-                self.widget.tree.bind("<<TreeviewOpen>>", self.open)
+                select = partial(gui.TreeBase.select, gui, ctrl)
+                ctrl.widget.bind_select(select)
+            if ctrl.opened:
+                open = partial(gui.TreeBase.open, gui, ctrl)
+                ctrl.widget.tree.bind("<<TreeviewOpen>>", open)
             if window.command:
-                self.widget.tree.bind("<Double-1>", window.activate)
+                ctrl.widget.tree.bind("<Double-1>", window.activate)
             
             if focus:
-                self.widget.tree.focus_set()
+                ctrl.widget.tree.focus_set()
                 return True
         
-        def clear(self):
-            return self.widget.tree.delete(*self.widget.tree.get_children())
+        def clear(gui, ctrl):
+            return ctrl.widget.tree.delete(*ctrl.widget.tree.get_children())
         
-        def add(self, *pos, selected=False, **kw):
-            item = self.widget.add(*pos, **kw)
+        def add(gui, ctrl, *pos, selected=False, **kw):
+            item = ctrl.widget.add(*pos, **kw)
             if selected:
                 # Empty selection returns empty string?!
-                selection = tuple(self.widget.tree.selection())
-                self.widget.tree.selection_set(selection + (item,))
+                selection = tuple(ctrl.widget.tree.selection())
+                ctrl.widget.tree.selection_set(selection + (item,))
             return item
         
-        def remove(self, item):
-            focus = self.widget.tree.focus()
+        def remove(gui, ctrl, item):
+            focus = ctrl.widget.tree.focus()
             if focus == item:
-                new = self.widget.tree.next(focus)
+                new = ctrl.widget.tree.next(focus)
                 if not new:
-                    new = self.widget.tree.prev(focus)
+                    new = ctrl.widget.tree.prev(focus)
                 if not new:
-                    new = self.widget.tree.parent(focus)
+                    new = ctrl.widget.tree.parent(focus)
             else:
                 new = ""
             
-            self.widget.tree.delete(item)
+            ctrl.widget.tree.delete(item)
             
             if new:
-                self.widget.tree.focus(new)
+                ctrl.widget.tree.focus(new)
         
-        def selection(self):
-            return self.widget.tree.selection()
+        def selection(gui, ctrl):
+            return ctrl.widget.tree.selection()
         
-        def select(self, event):
-            self.selected()
+        def select(gui, ctrl, event):
+            ctrl.selected()
+            
+        def open(gui, ctrl, event):
+            ctrl.opened(ctrl.widget.tree.focus())
         
-        def open(self, event):
-            self.opened(self.widget.tree.focus())
-        
-        def __iter__(self):
-            return iter(self.widget.tree.get_children())
+        def iter(gui, ctrl):
+            return iter(ctrl.widget.tree.get_children())
     
+    @stash(controls.__setitem__, List)
     class List(TreeBase):
-        def place_on(self, *pos, **kw):
-            return Ttk.TreeBase.place_on(self, *pos, tree=False, **kw)
+        def init(gui, *pos, **kw):
+            return gui.TreeBase.init(gui, *pos, tree=False, **kw)
         
-        def add(self, columns, *pos, **kw):
-            return Ttk.TreeBase.add(self, *pos, values=columns, **kw)
-        
-        def get(self, item):
-            return self.widget.tree.item(item, option="values")
+        def add(gui, ctrl, columns, *pos, **kw):
+            return gui.TreeBase.add(gui, ctrl, *pos, values=columns, **kw)
+            
+        def get(gui, ctrl, item):
+            return ctrl.widget.tree.item(item, option="values")
     
+    @stash(controls.__setitem__, Tree)
     class Tree(TreeBase):
-        def add(self, parent, text, *pos, **kw):
+        def add(gui, ctrl, parent, text, *pos, **kw):
             if not parent:
                 parent = ""
-            return Ttk.TreeBase.add(self, parent, *pos, text=text, **kw)
+            return gui.TreeBase.add(gui, ctrl, parent, *pos, text=text, **kw)
         
         def children(self, parent):
             if not parent:
@@ -194,107 +178,93 @@ class Ttk(object):
         def set(self, item, text):
             self.widget.tree.item(item, text=text)
     
+    @stash(controls.__setitem__, MenuEntry)
     class MenuEntry(object):
-        expand = True
-        
-        def __init__(self, menu, value):
-            self.menu = menu
-            self.value = value
-        
-        def place_on(self, window, master, focus, resize=False):
-            self.var = StringVar()
-            self.widget = ttk.OptionMenu(master, self.var, self.value,
-                *self.menu)
+        def init(gui, ctrl, window, master, focus, resize=False):
+            ctrl.var = StringVar()
+            ctrl.widget = ttk.OptionMenu(master, ctrl.var, ctrl.value,
+                *ctrl.menu)
             if focus:
-                self.widget.focus_set()
+                ctrl.widget.focus_set()
                 return True
         
-        def get(self):
-            return self.var.get()
+        def get(gui, ctrl):
+            return ctrl.var.get()
     
-    class Inline(object):
-        expand = True
-        
-        def __init__(self, *cells):
-            self.cells = cells
-        
-        def place_on(self, window, master, focus, resize=False):
+    @stash(controls.__setitem__, Inline)
+    class Inline:
+        def init(gui, ctrl, window, master, focus, resize=False):
             focussed = False
-            self.widget = ttk.Frame(master)
+            ctrl.widget = ttk.Frame(master)
             all_expand = not any(getattr(cell, "expand", False)
-                for cell in self.cells)
-            for (col, cell) in enumerate(self.cells):
+                for cell in ctrl.cells)
+            for (col, cell) in enumerate(ctrl.cells):
                 resize_this = resize and col == len(ctrl.cells) - 1
-                focussed |= bool(cell.place_on(window, self.widget,
+                place = gui.controls[type(cell)].init
+                focussed |= bool(place(gui, cell, window, ctrl.widget,
                     not focussed and focus, resize_this))
                 sticky = list()
                 if getattr(cell, "expand", False):
                     sticky.append(tkinter.EW)
                 cell.widget.grid(row=0, column=col, sticky=sticky)
                 if all_expand or getattr(cell, "expand", False):
-                    self.widget.columnconfigure(col, weight=1)
+                    ctrl.widget.columnconfigure(col, weight=1)
             return focussed
     
-    class Form(object):
-        def __init__(self, *fields):
-            self.fields = fields
-            self.depth = self.get_depth(self.fields)
-        
-        def get_depth(self, fields):
-            depth = 0
-            for field in fields:
-                if isinstance(field, Ttk.Section):
-                    depth = max(depth, 1 + self.get_depth(field.fields))
-            return depth
-        
-        def place_on(self, window, master, focus, resize=False):
-            self.widget = ttk.Frame(master)
-            form = tkwrap.Form(self.widget, column=self.depth)
+    @stash(controls.__setitem__, Form)
+    class Form:
+        def init(gui, ctrl, window, master, focus, resize=False):
+            ctrl.widget = ttk.Frame(master)
+            form = tkwrap.Form(ctrl.widget, column=ctrl.depth)
             
-            if self.depth:
+            if ctrl.depth:
                 font = nametofont("TkDefaultFont")
-                self.top = font.metrics("linespace")
-                self.side = font_size(font["size"])
-                self.padding = font_size(font["size"] / 2)
-                for level in range(self.depth):
-                    form.master.columnconfigure(level, minsize=self.side)
-                    col = self.depth * 2 + 2 - level - 1
-                    form.master.columnconfigure(col, minsize=self.side)
+                ctrl.top = font.metrics("linespace")
+                ctrl.side = font_size(font["size"])
+                ctrl.padding = font_size(font["size"] / 2)
+                for level in range(ctrl.depth):
+                    form.master.columnconfigure(level, minsize=ctrl.side)
+                    col = ctrl.depth * 2 + 2 - level - 1
+                    form.master.columnconfigure(col, minsize=ctrl.side)
             
-            return self.place_fields(self.fields, window, form, 0, focus)
+            place = gui.controls[Form].place_fields
+            return place(gui, ctrl, ctrl.fields, window, form, 0, focus)
         
-        def place_fields(self, fields, window, form, level, focus):
+        def place_fields(gui, ctrl, fields, window, form, level, focus):
             focussed = False
             for field in fields:
-                if isinstance(field, Ttk.Section):
-                    group = ttk.LabelFrame(form.master, **field.label)
+                if isinstance(field, Section):
+                    label = convert_label(field)
+                    group = ttk.LabelFrame(form.master, **label)
                     (_, group_row) = form.master.size()
-                    span = (self.depth - level) * 2 + 2
+                    span = (ctrl.depth - level) * 2 + 2
                     group.grid(
                         column=level, columnspan=span,
                         sticky=tkinter.NSEW,
-                        padx=self.padding, pady=(0, self.padding),
+                        padx=ctrl.padding, pady=(0, ctrl.padding),
                     )
                     
-                    focussed |= bool(self.place_fields(field.fields, window,
+                    place = gui.controls[Form].place_fields
+                    focussed |= bool(place(gui, ctrl, field.fields, window,
                         form, level + 1, not focussed and focus))
                     
                     (_, rows) = form.master.size()
                     group.grid(rowspan=rows + 1 - group_row)
-                    form.master.rowconfigure(group_row, minsize=self.top)
-                    form.master.rowconfigure(rows, minsize=self.side)
+                    form.master.rowconfigure(group_row, minsize=ctrl.top)
+                    form.master.rowconfigure(rows, minsize=ctrl.side)
                     continue
                 
-                if isinstance(field, Ttk.Field):
+                if isinstance(field, Field):
                     target = field.field
                 else:
                     target = field
-                focussed |= bool(target.place_on(window, form.master,
+                place = gui.controls[type(target)].init
+                focussed |= bool(place(gui, target, window, form.master,
                     not focussed and focus))
                 multiline = getattr(target, "multiline", False)
                 
-                if isinstance(field, Ttk.Field):
-                    kw = convert_label(field.label, field.access)
+                if isinstance(field, Field):
+                    kw = convert_label(field)
                     if multiline:
                         kw["multiline"] = True
                     form.add_field(target.widget, **kw)
@@ -304,7 +274,7 @@ class Ttk(object):
                         sticky.append(tkinter.EW)
                     if multiline:
                         sticky.append(tkinter.NS)
-                    span = (self.depth - level) * 2 + 2
+                    span = (ctrl.depth - level) * 2 + 2
                     target.widget.grid(column=level, columnspan=span,
                         sticky=sticky)
                     if multiline:
@@ -312,16 +282,6 @@ class Ttk(object):
                         form.master.rowconfigure(row, weight=1)
             
             return focussed
-    
-    class Section(object):
-        def __init__(self, label, *fields, access=None):
-            self.fields = fields
-            self.label = convert_label(label, access)
-    class Field(object):
-        def __init__(self, label, field, access=None):
-            self.label = label
-            self.field = field
-            self.access = access
     
     def file_browse(self, mode, parent=None, *,
     title=None, types, file=None):
@@ -347,8 +307,8 @@ class Ttk(object):
         from eventgen.tk import Driver
         return Driver(self.root)
 
-def convert_label(label, key=None):
-    label = label_key(label, key)
+def convert_label(ctrl):
+    label = ctrl.label_key()
     if label is None:
         return dict()
     (head, sep, tail) = label.partition("&")

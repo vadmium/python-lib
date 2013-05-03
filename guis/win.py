@@ -14,8 +14,6 @@ from win32con import (WM_SETFONT, WM_INITDIALOG, WM_COMMAND, WM_NOTIFY)
 from win32con import SW_SHOWNORMAL
 from win32gui import GetStockObject
 from win32gui import (SelectObject, GetTextMetrics)
-from . import label_key
-from . import InnerClass
 from win32api import GetSystemMetrics
 from win32con import (SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_CYCAPTION)
 from win32con import (BS_GROUPBOX, BS_PUSHBUTTON)
@@ -31,7 +29,6 @@ from commctrl import (LVS_EX_FULLROWSELECT, LVCFMT_LEFT)
 from win32gui_struct import (
     PackLVCOLUMN, PackLVITEM, EmptyLVITEM, UnpackLVITEM,
 )
-from collections import (Mapping, Iterable)
 from win32gui import InitCommonControls
 from win32gui import (GetOpenFileNameW, GetSaveFileNameW)
 from win32con import (
@@ -44,6 +41,9 @@ from win32gui import PyMakeBuffer
 from struct import Struct
 from commctrl import (LVN_ITEMCHANGED, LVIF_STATE, LVIF_TEXT)
 from win32con import ES_AUTOHSCROLL
+from functools import partial
+from . import (Form, Section, Field, Inline, Entry, Button, List)
+from . import stash
 
 class Win(object):
     def __init__(self):
@@ -53,302 +53,224 @@ class Win(object):
         if self.visible:
             PumpMessages()
     
-    class Window(object, metaclass=InnerClass):
-        def __init__(self, gui, parent=None, *, title=None, sections):
-            self.gui = gui
-            
-            template = (title, (0, 0, 0, 0), WS_OVERLAPPEDWINDOW)
-            handlers = {
-                WM_INITDIALOG: self.on_init_dialog,
-                WM_DESTROY: self.on_destroy,
-                WM_CLOSE: self.on_close,
-                WM_SIZE: self.on_size,
-                WM_COMMAND: self.on_command,
-                WM_NOTIFY: self.on_notify,
-            }
-            self.sections = sections
-            
-            self.commands = dict()
-            self.id = 1024
-            
-            if parent:
-                parent = parent.hwnd
-            
-            self.init_exc = None
-            try:
-                CreateDialogIndirect(None, (template,), parent, handlers)
-                if self.init_exc:
-                    raise self.init_exc
-            finally:
-                del self.init_exc
-            
-            (left, top, _, _) = GetWindowRect(self.hwnd)
-            width = round(80 * self.x_unit) + round(160 * self.x_unit)
-            height = round(250 * self.y_unit)
-            width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
-            height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
-            height += GetSystemMetrics(SM_CYCAPTION)
-            MoveWindow(self.hwnd, left, top, width, height, 0)
-            
-            ShowWindow(self.hwnd, SW_SHOWNORMAL)
-            self.gui.visible.add(self)
+    def new_window(self, win, parent=None, *, title=None, contents):
+        template = (title, (0, 0, 0, 0), WS_OVERLAPPEDWINDOW)
+        handlers = {
+            WM_INITDIALOG: partial(self.on_init_dialog, win),
+            WM_DESTROY: partial(self.on_destroy, win),
+            WM_CLOSE: partial(self.on_close, win),
+            WM_SIZE: partial(self.on_size, win),
+            WM_COMMAND: partial(self.on_command, win),
+            WM_NOTIFY: partial(self.on_notify, win),
+        }
+        win.contents = contents
         
-        def on_init_dialog(self, hwnd, msg, wparam, lparam):
-            try:
-                self.hwnd = hwnd
-                
-                dc = GetDC(self.hwnd)
-                try:
-                    prev = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT))
-                    try:
-                        tm = GetTextMetrics(dc)
-                        self.x_unit = (tm["AveCharWidth"] + 1) / 4
-                        self.y_unit = tm["Height"] / 8
-                    finally:
-                        SelectObject(dc, prev)
-                finally:
-                    ReleaseDC(self.hwnd, dc)
-                
-                self.label_height = round(9 * self.y_unit)
-                
-                self.fixed_height = 0
-                self.var_heights = 0
-                self.notify = dict()
-                for section in self.sections:
-                    if not isinstance(section, Iterable):
-                        section.place_on(self)
-                        self.fixed_height += section.height
-                        continue
-                    
-                    access = section.pop("access", None)
-                    label = label_key(section.pop("label"), access)
-                    section["hwnd"] = create_control(self.hwnd, "BUTTON",
-                        style=BS_GROUPBOX, text=label,
-                    )
-                    self.fixed_height += self.label_height
-                    
-                    for field in section["fields"]:
-                        if isinstance(field, Mapping):
-                            access = field.pop("access", None)
-                            label = label_key(field.pop("label"), access)
-                            target = field["field"]
-                            
-                            field["label"] = create_control(self.hwnd,
-                                "STATIC", text=label)
-                        else:
-                            target = field
-                        
-                        target.place_on(self)
-                        if target.height:
-                            self.fixed_height += max(self.label_height,
-                                target.height)
-                        else:
-                            self.var_heights += 1
-                    
-                    self.fixed_height += round(4 * self.y_unit)
-            
-            except BaseException as exc:
-                self.init_exc = exc
+        win.commands = dict()
+        win.id = 1024
         
-        def on_destroy(self, hwnd, msg, wparam, lparam):
-            self.gui.visible.remove(self)
-            if not self.gui.visible:
-                PostQuitMessage(0)
+        if parent:
+            parent = parent.hwnd
         
-        def on_close(self, hwnd, msg, wparam, lparam):
-            self.close()
+        win.init_exc = None  # Tunnel exceptions raised during WM_INITDIALOG
+        try:
+            CreateDialogIndirect(None, (template,), parent, handlers)
+            if win.init_exc:
+                raise win.init_exc
+        finally:
+            del win.init_exc
         
-        def close(self):
-            DestroyWindow(self.hwnd)
+        (left, top, _, _) = GetWindowRect(win.hwnd)
+        width = round(80 * win.x_unit) + round(160 * win.x_unit)
+        height = round(250 * win.y_unit)
+        width += GetSystemMetrics(SM_CXSIZEFRAME) * 2
+        height += GetSystemMetrics(SM_CYSIZEFRAME) * 2
+        height += GetSystemMetrics(SM_CYCAPTION)
+        MoveWindow(win.hwnd, left, top, width, height, 0)
         
-        def on_size(self, hwnd, msg, wparam, lparam):
-            cx = LOWORD(lparam)
-            cy = HIWORD(lparam)
-            
-            y = 0
-            spare_height = cy - self.fixed_height
-            for section in self.sections:
-                if not isinstance(section, Iterable):
-                    section.move(0, y, cx, section.height)
-                    continue
-                
-                group_top = y
-                y += self.label_height
-                for field in section["fields"]:
-                    if isinstance(field, Mapping):
-                        target = field["field"]
-                    else:
-                        target = field
-                    
-                    if target.height:
-                        field_height = max(self.label_height, target.height)
-                        label_y = y + (field_height - self.label_height) // 2
-                    else:
-                        field_height = spare_height // self.var_heights
-                        spare_height += 1 # Distribute rounding from division
-                        label_y = y
-                    
-                    if isinstance(field, Mapping):
-                        label_width = round(80 * self.x_unit)
-                        MoveWindow(field["label"],
-                            0, label_y, label_width, self.label_height, 1)
-                    else:
-                        label_width = 0
-                    
-                    target_width = cx - label_width
-                    target.move(label_width, y, target_width, field_height)
-                    
-                    y += field_height
-                
-                y += round(4 * self.y_unit)
-                group_height = y - group_top
-                MoveWindow(section["hwnd"],
-                    0, group_top, cx, group_height, 1)
-            
-            return 1
-        
-        def on_command(self, hwnd, msg, wparam, lparam):
-            id = LOWORD(wparam)
-            try:
-                command = self.commands[id]
-            except LookupError:
-                return
-            command()
-        
-        def on_notify(self, hwnd, msg, wparam, lparam):
-            (hwndFrom, _, code) = NMHDR.unpack(lparam)
-            try:
-                notify = self.notify[hwndFrom]
-            except LookupError:
-                pass
-            else:
-                notify(code, lparam)
-            return 1
+        ShowWindow(win.hwnd, SW_SHOWNORMAL)
+        self.visible.add(win)
     
-    class Entry(object):
-        def __init__(self, value=None):
-            self.value = value
+    def on_init_dialog(self, win, hwnd, msg, wparam, lparam):
+        try:
+            win.hwnd = hwnd
+            
+            dc = GetDC(win.hwnd)
+            try:
+                prev = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT))
+                try:
+                    tm = GetTextMetrics(dc)
+                    win.x_unit = (tm["AveCharWidth"] + 1) / 4
+                    win.y_unit = tm["Height"] / 8
+                finally:
+                    SelectObject(dc, prev)
+            finally:
+                ReleaseDC(win.hwnd, dc)
+            
+            win.label_height = round(9 * win.y_unit)
+            
+            win.notify = dict()
+            self.controls[type(win.contents)].init(self, win.contents, win)
         
-        def place_on(self, parent):
-            self.parent = parent.hwnd
-            self.height = round(12 * parent.y_unit)
-            self.width = 0
-            self.hwnd = create_control(self.parent, "EDIT",
+        except BaseException as exc:
+            win.init_exc = exc
+    
+    def on_destroy(self, win, hwnd, msg, wparam, lparam):
+        self.visible.remove(win)
+        if not self.visible:
+            PostQuitMessage(0)
+    
+    def on_close(self, win, hwnd, msg, wparam, lparam):
+        win.close()
+    
+    def close_window(self, win):
+        DestroyWindow(win.hwnd)
+    
+    def on_size(self, win, hwnd, msg, wparam, lparam):
+        cx = LOWORD(lparam)
+        cy = HIWORD(lparam)
+        move = self.controls[type(win.contents)].move
+        move(self, win, win.contents, 0, 0, cx, cy)
+        return 1
+    
+    def on_command(self, win, hwnd, msg, wparam, lparam):
+        id = LOWORD(wparam)
+        try:
+            command = win.commands[id]
+        except LookupError:
+            return
+        command()
+    
+    def on_notify(self, win, hwnd, msg, wparam, lparam):
+        (hwndFrom, _, code) = NMHDR.unpack(lparam)
+        try:
+            notify = win.notify[hwndFrom]
+        except LookupError:
+            pass
+        else:
+            notify(code, lparam)
+        return 1
+    
+    controls = dict()
+    
+    @stash(controls.__setitem__, Entry)
+    class Entry(object):
+        def init(gui, ctrl, parent):
+            ctrl.place(gui)
+            ctrl.parent = parent.hwnd
+            ctrl.height = round(12 * parent.y_unit)
+            ctrl.width = 0
+            ctrl.hwnd = create_control(ctrl.parent, "EDIT",
                 tabstop=True,
-                text=self.value,
+                text=ctrl.value,
                 style=ES_AUTOHSCROLL,
                 ex_style=WS_EX_CLIENTEDGE,
             )
         
-        def move(self, left, top, width, height):
-            top += (height - self.height) // 2
-            MoveWindow(self.hwnd, left, top, width, self.height, 1)
+        def move(gui, win, ctrl, left, top, width, height):
+            top += (height - ctrl.height) // 2
+            MoveWindow(ctrl.hwnd, left, top, width, ctrl.height, 1)
         
-        def get(self):
-            return GetWindowText(self.hwnd)
+        def get(gui, ctrl):
+            return GetWindowText(ctrl.hwnd)
         
-        def set(self, text):
-            SetWindowText(self.hwnd, text)
+        def set(gui, ctrl, text):
+            SetWindowText(ctrl.hwnd, text)
     
+    @stash(controls.__setitem__, Button)
     class Button(object):
-        def __init__(self, label, command=None, access=None):
-            self.label = label_key(label, access)
-            self.command = command
-        
-        def place_on(self, parent):
-            self.parent = parent.hwnd
-            if self.command:
+        def init(gui, ctrl, parent):
+            ctrl.parent = parent.hwnd
+            if ctrl.command:
                 id = parent.id
                 parent.id += 1
-                parent.commands[id] = self.command
+                parent.commands[id] = ctrl.command
             else:
                 id = None
             
-            self.width = round(50 * parent.x_unit)
-            self.height = round(14 * parent.y_unit)
+            ctrl.width = round(50 * parent.x_unit)
+            ctrl.height = round(14 * parent.y_unit)
             
-            disabled = self.command is None
-            self.hwnd = create_control(self.parent, "BUTTON",
+            disabled = ctrl.command is None
+            ctrl.hwnd = create_control(ctrl.parent, "BUTTON",
                 style=BS_PUSHBUTTON | WS_DISABLED * disabled,
                 tabstop=True,
-                text=self.label,
+                text=ctrl.label_key(),
                 id=id,
             )
         
-        def move(self, left, top, width, height):
-            left += (width - self.width) // 2
-            top += (height - self.height) // 2
-            MoveWindow(self.hwnd, left, top, self.width, self.height, 1)
+        def move(gui, win, ctrl, left, top, width, height):
+            left += (width - ctrl.width) // 2
+            top += (height - ctrl.height) // 2
+            MoveWindow(ctrl.hwnd, left, top, ctrl.width, ctrl.height, 1)
     
+    @stash(controls.__setitem__, List)
     class List(object):
-        def __init__(self, headings, selected=None):
-            self.headings = headings
-            self.sel_set = set()
-            self.selected = selected
-        
-        def place_on(self, parent):
-            self.parent = parent.hwnd
-            self.height = 0
+        def init(gui, ctrl, parent):
+            ctrl.place(gui)
+            ctrl.sel_set = set()
+            
+            ctrl.parent = parent.hwnd
+            ctrl.height = 0
             InitCommonControls()
-            self.hwnd = create_control(self.parent, WC_LISTVIEW,
+            ctrl.hwnd = create_control(ctrl.parent, WC_LISTVIEW,
                 style=LVS_SHOWSELALWAYS | LVS_REPORT,
                 tabstop=True,
                 ex_style=WS_EX_CLIENTEDGE,
             )
-            parent.notify[self.hwnd] = self.notify
+            parent.notify[ctrl.hwnd] = partial(gui.List.notify, gui, ctrl)
             
-            style = SendMessage(self.hwnd, LVM_GETEXTENDEDLISTVIEWSTYLE,
+            style = SendMessage(ctrl.hwnd, LVM_GETEXTENDEDLISTVIEWSTYLE,
                 0, 0)
             style |= LVS_EX_FULLROWSELECT
-            SendMessage(self.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, style)
+            SendMessage(ctrl.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, style)
             
-            self.columns = list()
-            for (i, heading) in enumerate(self.headings):
+            ctrl.column_refs = list()
+            for (i, heading) in enumerate(ctrl.columns):
                 (param, obj) = PackLVCOLUMN(
                     fmt=LVCFMT_LEFT, text=heading, cx=50,
                 )
-                self.columns.append(obj)
-                SendMessage(self.hwnd, LVM_INSERTCOLUMNW, i, param)
+                ctrl.column_refs.append(obj)
+                SendMessage(ctrl.hwnd, LVM_INSERTCOLUMNW, i, param)
             
-            self.items = list()
+            ctrl.items = list()
         
-        def move(self, left, top, width, height):
-            MoveWindow(self.hwnd, left, top, width, height, 1)
+        def move(gui, win, ctrl, left, top, width, height):
+            MoveWindow(ctrl.hwnd, left, top, width, height, 1)
         
-        def clear(self):
-            SendMessage(self.hwnd, LVM_DELETEALLITEMS)
-            del self.items[:]
-            self.sel_set.clear()
+        def clear(gui, ctrl):
+            SendMessage(ctrl.hwnd, LVM_DELETEALLITEMS)
+            del ctrl.items[:]
+            ctrl.sel_set.clear()
         
-        def add(self, columns, selected=False):
-            item = len(self.items)
+        def add(gui, ctrl, columns, selected=False):
+            item = len(ctrl.items)
             columns = iter(columns)
             (param, obj) = PackLVITEM(
                 item=item,
                 text=next(columns),
                 stateMask=LVIS_SELECTED, state=LVIS_SELECTED * selected,
             )
-            self.items.append([obj])
-            cb = self.selected
-            self.selected = None
-            item = SendMessage(self.hwnd, LVM_INSERTITEMW, 0, param)
-            self.selected = cb
+            ctrl.items.append([obj])
+            cb = ctrl.selected
+            ctrl.selected = None
+            item = SendMessage(ctrl.hwnd, LVM_INSERTITEMW, 0, param)
+            ctrl.selected = cb
             
             for (col, text) in enumerate(columns, 1):
                 (param, obj) = PackLVITEM(text=text, subItem=col)
-                self.items[-1].append(obj)
-                SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
+                ctrl.items[-1].append(obj)
+                SendMessage(ctrl.hwnd, LVM_SETITEMTEXTW, item, param)
             
             if selected:
-                self.sel_set.add(item)
-                if self.selected:
-                    self.selected()
+                ctrl.sel_set.add(item)
+                if ctrl.selected:
+                    ctrl.selected()
         
-        def remove(self, item):
-            self.items.pop(item)
-            SendMessage(self.hwnd, LVM_DELETEITEM, item)
+        def remove(gui, ctrl, item):
+            ctrl.items.pop(item)
+            SendMessage(ctrl.hwnd, LVM_DELETEITEM, item)
         
-        def notify(self, code, pnmh):
+        def notify(gui, ctrl, code, pnmh):
             if code != LVN_ITEMCHANGED:
                 return
             (_, _, _, item, _, new, old, changed, _, _, _) = (
@@ -361,58 +283,143 @@ class Win(object):
                 return
             
             if new:
-                self.sel_set.add(item)
+                ctrl.sel_set.add(item)
             else:
-                self.sel_set.remove(item)
+                ctrl.sel_set.remove(item)
             
-            if self.selected:
-                self.selected()
+            if ctrl.selected:
+                ctrl.selected()
         
-        def get(self, item):
+        def get(gui, ctrl, item):
             values = list()
-            for col in range(len(self.headings)):
+            for col in range(len(ctrl.columns)):
                 (lvitem, obj) = EmptyLVITEM(0, col, LVIF_TEXT)
-                SendMessage(self.hwnd, LVM_GETITEMTEXTW, item, lvitem)
+                SendMessage(ctrl.hwnd, LVM_GETITEMTEXTW, item, lvitem)
                 (_, _, _, _, text, _, _, _) = UnpackLVITEM(lvitem)
                 values.append(text)
             return values
         
-        def selection(self):
-            return sorted(self.sel_set)
+        def selection(gui, ctrl):
+            return sorted(ctrl.sel_set)
         
-        def __iter__(self):
-            return iter(range(len(self.items)))
+        def iter(gui, ctrl):
+            return iter(range(len(ctrl.items)))
     
-    class Layout(object):
-        def __init__(self, cells):
-            self.cells = cells
+    @stash(controls.__setitem__, Form)
+    class Form:
+        def init(gui, ctrl, win):
+            ctrl.fixed_height = 0
+            ctrl.var_heights = 0
+            for section in ctrl.fields:
+                if not isinstance(section, (Section, Field)):
+                    gui.controls[type(section)].init(gui, section, win)
+                    if section.height:
+                        ctrl.fixed_height += section.height
+                    else:
+                        ctrl.var_heights += 1
+                    continue
+                
+                label = section.label_key()
+                section.hwnd = create_control(win.hwnd, "BUTTON",
+                    style=BS_GROUPBOX, text=label,
+                )
+                ctrl.fixed_height += win.label_height
+                
+                for field in section.fields:
+                    if isinstance(field, Field):
+                        label = field.label_key()
+                        target = field.field
+                        
+                        field.label = create_control(win.hwnd,
+                            "STATIC", text=label)
+                    else:
+                        target = field
+                    
+                    gui.controls[type(target)].init(gui, target, win)
+                    if target.height:
+                        ctrl.fixed_height += max(win.label_height,
+                            target.height)
+                    else:
+                        ctrl.var_heights += 1
+                
+                ctrl.fixed_height += round(4 * win.y_unit)
         
-        def place_on(self, parent):
-            self.height = 0
-            self.fixed_width = 0
-            self.var_widths = 0
-            for cell in self.cells:
-                cell.place_on(parent)
-                self.height = max(self.height, cell.height)
+        def move(gui, win, ctrl, x, y, cx, cy):
+            spare_height = cy - ctrl.fixed_height
+            for section in ctrl.fields:
+                if not isinstance(section, (Section, Field)):
+                    field_height = section.height
+                    if not field_height:
+                        field_height = spare_height // ctrl.var_heights
+                        spare_height += 1  # Distribute division rounding
+                    move = gui.controls[type(section)].move
+                    move(gui, win, section, 0, y, cx, field_height)
+                    y += field_height
+                    continue
+                
+                group_top = y
+                y += win.label_height
+                for field in section.fields:
+                    if isinstance(field, Field):
+                        target = field.field
+                    else:
+                        target = field
+                    
+                    if target.height:
+                        field_height = max(win.label_height, target.height)
+                        label_y = y + (field_height - win.label_height) // 2
+                    else:
+                        field_height = spare_height // ctrl.var_heights
+                        spare_height += 1 # Distribute rounding from division
+                        label_y = y
+                    
+                    if isinstance(field, Field):
+                        label_width = round(80 * win.x_unit)
+                        MoveWindow(field.label,
+                            0, label_y, label_width, win.label_height, 1)
+                    else:
+                        label_width = 0
+                    
+                    target_width = cx - label_width
+                    move = gui.controls[type(target)].move
+                    move(gui, win, target,
+                        label_width, y, target_width, field_height)
+                    
+                    y += field_height
+                
+                y += round(4 * win.y_unit)
+                group_height = y - group_top
+                MoveWindow(section.hwnd, 0, group_top, cx, group_height, 1)
+    
+    @stash(controls.__setitem__, Inline)
+    class Inline:
+        def init(gui, ctrl, parent):
+            ctrl.height = 0
+            ctrl.fixed_width = 0
+            ctrl.var_widths = 0
+            for cell in ctrl.cells:
+                gui.controls[type(cell)].init(gui, cell, parent)
+                ctrl.height = max(ctrl.height, cell.height)
                 
                 if cell.width:
-                    self.fixed_width += cell.width
+                    ctrl.fixed_width += cell.width
                 else:
-                    self.var_widths += 1
+                    ctrl.var_widths += 1
         
-        def move(self, left, top, width, height):
-            var_widths = self.var_widths
+        def move(gui, win, ctrl, left, top, width, height):
+            var_widths = ctrl.var_widths
             all_vary = not var_widths
             if all_vary:
-                var_widths = len(self.cells)
+                var_widths = len(ctrl.cells)
             
-            width -= self.fixed_width
-            for cell in self.cells:
+            width -= ctrl.fixed_width
+            for cell in ctrl.cells:
                 cell_width = cell.width
                 if all_vary or not cell_width:
                     cell_width += width // var_widths
                     width += 1  # Distribute rounding from the division
-                cell.move(left, top, cell_width, self.height)
+                move = gui.controls[type(cell)].move
+                move(gui, win, cell, left, top, cell_width, ctrl.height)
                 left += cell_width
     
     def file_browse(self, mode, parent=None, *,
