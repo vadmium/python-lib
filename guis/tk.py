@@ -1,5 +1,5 @@
 from tkinter import Tk
-from tkinter.ttk import (Button, Entry, Frame, LabelFrame, OptionMenu)
+from tkinter import ttk
 import tkinter
 from tkinter.filedialog import (askopenfilename, asksaveasfilename)
 from tkinter import StringVar
@@ -7,7 +7,7 @@ from tkinter import Toplevel
 from tkwrap import ScrolledTree
 from tkinter.font import nametofont
 from tkwrap import font_size
-from tkwrap import Form
+import tkwrap
 from . import InnerClass
 from . import label_key
 
@@ -52,7 +52,7 @@ class Ttk(object):
             self.value = value
         
         def place_on(self, window, master, focus=False, resize=False):
-            self.widget = Entry(master)
+            self.widget = ttk.Entry(master)
             if self.value:
                 self.widget.insert(0, self.value)
             if focus:
@@ -86,7 +86,7 @@ class Ttk(object):
         
         def place_on(self, window, master, focus=False, resize=False):
             self.window = window
-            self.widget = Button(master, **self.kw)
+            self.widget = ttk.Button(master, **self.kw)
             if self.disabled:
                 self.widget.state(("disabled",))
             if focus:
@@ -203,7 +203,7 @@ class Ttk(object):
         
         def place_on(self, window, master, focus, resize=False):
             self.var = StringVar()
-            self.widget = OptionMenu(master, self.var, self.value,
+            self.widget = ttk.OptionMenu(master, self.var, self.value,
                 *self.menu)
             if focus:
                 self.widget.focus_set()
@@ -220,7 +220,7 @@ class Ttk(object):
         
         def place_on(self, window, master, focus, resize=False):
             focussed = False
-            self.widget = Frame(master)
+            self.widget = ttk.Frame(master)
             all_expand = not any(getattr(cell, "expand", False)
                 for cell in self.cells)
             for (col, cell) in enumerate(self.cells):
@@ -248,8 +248,8 @@ class Ttk(object):
             return depth
         
         def place_on(self, window, master, focus, resize=False):
-            self.widget = Frame(master)
-            form = Form(self.widget, column=self.depth)
+            self.widget = ttk.Frame(master)
+            form = tkwrap.Form(self.widget, column=self.depth)
             
             if self.depth:
                 font = nametofont("TkDefaultFont")
@@ -267,7 +267,7 @@ class Ttk(object):
             focussed = False
             for field in fields:
                 if isinstance(field, Ttk.Section):
-                    group = LabelFrame(form.master, **field.label)
+                    group = ttk.LabelFrame(form.master, **field.label)
                     (_, group_row) = form.master.size()
                     span = (self.depth - level) * 2 + 2
                     group.grid(
