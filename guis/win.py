@@ -114,6 +114,9 @@ class Win(object):
         except BaseException as exc:
             win.init_exc = exc
     
+    def set_close(self, win):
+        pass
+    
     def on_destroy(self, win, hwnd, msg, wparam, lparam):
         self.visible.remove(win)
         if not self.visible:

@@ -1,4 +1,5 @@
 from misc import Function
+from types import MethodType
 from misc import deco_factory
 
 @deco_factory
@@ -18,6 +19,10 @@ class Window:
     def __init__(self, gui, *pos, **kw):
         self.gui = gui
         self.gui.new_window(self, *pos, **kw)
+        close = self.close
+        if (not isinstance(close, MethodType) or
+        (close.__self__, close.__func__) != (self, Window.close)):
+            self.gui.set_close(self)
     def close(self):
         return self.gui.close_window(self)
 

@@ -39,6 +39,9 @@ class Ttk(object):
         place(self, contents, win, win.window, focus=True, resize=True)
         contents.widget.pack(fill=tkinter.BOTH, expand=True)
     
+    def set_close(self, win):
+        win.window.protocol("WM_DELETE_WINDOW", win.close)
+    
     def close_window(self, win):
         win.window.destroy()
     
