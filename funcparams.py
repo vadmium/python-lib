@@ -355,3 +355,22 @@ def noarg_param(param):
 def multi_param(param):
     return (isinstance(param.default, (tuple, list, Set)) and
         not param.default)
+
+def main():
+    import importlib
+    from types import ModuleType
+    
+    name = sys.argv[1]
+    (module, sep, attr) = name.rpartition(".")
+    if sep:
+        func = getattr(importlib.import_module(module), attr, None)
+    else:
+        func = None
+    if func is None:
+        func = importlib.import_module(name)
+    if isinstance(func, ModuleType):
+        func = getattr(func, "main")
+    command(func, sys.argv[2:])
+
+if __name__ == "__main__":
+    main()
