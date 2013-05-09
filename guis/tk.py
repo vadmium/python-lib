@@ -224,7 +224,7 @@ class Ttk(object):
             all_expand = not any(getattr(cell, "expand", False)
                 for cell in self.cells)
             for (col, cell) in enumerate(self.cells):
-                resize_this = resize and col == len(self.cells)
+                resize_this = resize and col == len(ctrl.cells) - 1
                 focussed |= bool(cell.place_on(window, self.widget,
                     not focussed and focus, resize_this))
                 sticky = list()
