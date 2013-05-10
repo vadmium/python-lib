@@ -322,9 +322,10 @@ class Win(object):
         
         def add(self, columns, selected=False):
             item = len(self.items)
+            columns = iter(columns)
             (param, obj) = PackLVITEM(
                 item=item,
-                text=columns[0],
+                text=next(columns),
                 stateMask=LVIS_SELECTED, state=LVIS_SELECTED * selected,
             )
             self.items.append([obj])
@@ -333,7 +334,7 @@ class Win(object):
             item = SendMessage(self.hwnd, LVM_INSERTITEMW, 0, param)
             self.selected = cb
             
-            for (col, text) in enumerate(columns[1:], 1):
+            for (col, text) in enumerate(columns, 1):
                 (param, obj) = PackLVITEM(text=text, subItem=col)
                 self.items[-1].append(obj)
                 SendMessage(self.hwnd, LVM_SETITEMTEXTW, item, param)
