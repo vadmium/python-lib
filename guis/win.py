@@ -137,19 +137,14 @@ class Win(object):
     
     def on_command(self, win, hwnd, msg, wparam, lparam):
         id = LOWORD(wparam)
-        try:
-            command = win.commands[id]
-        except LookupError:
-            return
-        command()
+        command = win.commands.get(id)
+        if command:
+            command()
     
     def on_notify(self, win, hwnd, msg, wparam, lparam):
         (hwndFrom, _, code) = NMHDR.unpack(lparam)
-        try:
-            notify = win.notify[hwndFrom]
-        except LookupError:
-            pass
-        else:
+        notify = win.notify.get(hwndFrom)
+        if notify:
             notify(code, lparam)
         return 1
     
@@ -476,9 +471,6 @@ def create_control(parent, wndclass, text=None,
     SendMessage(hwnd, WM_SETFONT,
         GetStockObject(DEFAULT_GUI_FONT), MAKELONG(redraw, 0))
     return hwnd
-
-def nop():
-    pass
 
 class WinStruct(Struct):
     def unpack(self, p):
