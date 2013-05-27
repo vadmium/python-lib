@@ -3,6 +3,7 @@ from os.path import basename
 import os
 from functions import setitem
 from functions import Function, WrapperFunction
+import os.path
 
 def wrap_import():
     global installed_wrapper
@@ -106,6 +107,14 @@ def gen_repr(gi):
     else:
         return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
+
+def joinpath(path, base):
+    for elem in path:
+        if (os.path.dirname(elem) or
+        elem in (os.path.curdir, os.path.pardir, os.path.devnull)):
+            raise ValueError("SRR path element not supported "
+                "by OS: {}".format(elem))
+    return os.path.join(base, *path)
 
 def relpath(path, start=""):
     """Converts an OS path string to an OS independent path tuple
