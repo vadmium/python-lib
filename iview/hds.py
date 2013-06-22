@@ -25,7 +25,7 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
         try:
             return self.open1(req, headers)
         except http.client.BadStatusLine as err:
-            # If the server close the connection before receiving our reply,
+            # If the server closed the connection before receiving our reply,
             # the "http.client" module raises an exception with the "line"
             # attribute set to repr("")!
             if err.line != repr(""):
