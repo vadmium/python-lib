@@ -2,25 +2,18 @@
 
 from __future__ import print_function
 
+from misc import wrap_import
+wrap_import()
+
 from sys import stderr
 from misc import (WrapperFunction, Function)
 from contextlib import contextmanager
 import inspect
 from types import (
     FunctionType, MethodType, BuiltinFunctionType, BuiltinMethodType,
-    ModuleType, GeneratorType,
+    ModuleType, GeneratorType, InstanceType, ClassType,
 )
-
-try:  # Python 3
-    import reprlib
-except ImportError:  # Python < 3
-    import repr as reprlib
-
-try:  # Python < 3
-    from types import (InstanceType, ClassType)
-except ImportError:  # Python 3
-    InstanceType = object
-    ClassType = type
+import reprlib
 
 class traced(WrapperFunction):
     def __init__(self, func, abbrev=set()):

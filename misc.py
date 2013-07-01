@@ -98,6 +98,21 @@ class ImportWrapper(WrapperFunction):
         if not hasattr(io, "SEEK_CUR"):
             io.SEEK_CUR = self.__wrapped__("os", *pos, **kw).SEEK_CUR
     
+    @partial(fixups.__setitem__, "reprlib")
+    def _(self, *pos, **kw):
+        try:
+            self.__wrapped__("reprlib", *pos, **kw)
+        except ImportError:
+            sys.modules["reprlib"] = self.__wrapped__("repr", *pos, **kw)
+    
+    @partial(fixups.__setitem__, "types")
+    def _(self, *pos, **kw):
+        types = self.__wrapped__("types", *pos, **kw)
+        if not hasattr(types, "InstanceType"):
+            types.InstanceType = object
+        if not hasattr(types, "ClassType"):
+            types.ClassType = type
+    
     @partial(fixups.__setitem__, "urllib.parse")
     def _(self, *pos, **kw):
         try:
