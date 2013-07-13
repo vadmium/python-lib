@@ -74,9 +74,9 @@ class Ttk(object):
     class Button(object):
         def init(gui, ctrl, window, master, focus=False, resize=False):
             if ctrl.default:
-                command = partial(ctrl.default, window)
+                command = partial(ctrl.activate_default, window)
             elif ctrl.close:
-                command = partial(ctrl.close, window)
+                command = partial(ctrl.activate_close, window)
             else:
                 command = ctrl.command
             
@@ -110,7 +110,8 @@ class Ttk(object):
                 open = partial(gui.TreeBase.open, gui, ctrl)
                 ctrl.widget.tree.bind("<<TreeviewOpen>>", open)
             if window.command:
-                ctrl.widget.tree.bind("<Double-1>", window.activate)
+                activate = partial(gui.activate, window)
+                ctrl.widget.tree.bind("<Double-1>", activate)
             
             if focus:
                 ctrl.widget.tree.focus_set()
@@ -173,17 +174,18 @@ class Ttk(object):
                 parent = ""
             return gui.TreeBase.add(gui, ctrl, parent, *pos, text=text, **kw)
         
-        def children(self, parent):
+        def children(gui, ctrl, parent):
             if not parent:
                 parent = ""
-            return self.widget.tree.get_children(parent)
+            return ctrl.widget.tree.get_children(parent)
         
-        def set(self, item, text):
-            self.widget.tree.item(item, text=text)
+        def set(gui, ctrl, item, text):
+            ctrl.widget.tree.item(item, text=text)
     
     @stash(controls.__setitem__, MenuEntry)
     class MenuEntry(object):
         def init(gui, ctrl, window, master, focus, resize=False):
+            ctrl.place(gui)
             ctrl.var = StringVar()
             ctrl.widget = ttk.OptionMenu(master, ctrl.var, ctrl.value,
                 *ctrl.menu)

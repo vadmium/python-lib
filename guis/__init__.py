@@ -58,10 +58,10 @@ class Button(Labelled):
         self.default = default
         self.close = close
     
-    def default(self, window):
+    def activate_default(self, window):
         if window.command:
             window.command()
-    def close(self, window):
+    def activate_close(self, window):
         window.close()
 
 class TreeBase(Control):
@@ -97,7 +97,7 @@ class Tree(TreeBase):
     def set(self, item, text):
         return self.gui.controls[type(self)].set(self.gui, self, item, text)
 
-class MenuEntry:
+class MenuEntry(Control):
     expand = True
     def __init__(self, menu, value):
         self.menu = menu
