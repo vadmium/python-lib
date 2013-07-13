@@ -294,8 +294,8 @@ class Parser(object):
                 if self.at_eol():
                     raise StopIteration(parser.close())
                 else:
-                    parser.feed(self.eol.decode("Latin-1"))
-            parser.feed(self.c.decode("Latin-1"))
+                    parser.feed(self.eol.decode("latin-1"))
+            parser.feed(self.c.decode("latin-1"))
             yield self.next_char()
             yield self.after_eol()
         else:
