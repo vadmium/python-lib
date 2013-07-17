@@ -183,22 +183,7 @@ def help(func=None, file=stderr, param_types=dict()):
     (func, argspec, params, param_types, defaults) = inspect(
         func, param_types)
     
-    doc = getdoc(func)
-    if doc is None:
-        summary = None
-        body = None
-    else:
-        lines = doc.split("\n", 2)
-        if len(lines) > 1 and lines[1]:  # 2nd line exists and is not blank
-            summary = None
-            body = doc
-        else:
-            summary = lines[0]
-            try:
-                body = lines[2]
-            except LookupError:
-                body = None
-    
+    (summary, body) = splitdoc(getdoc(func))
     if summary:
         print(summary, file=file)
     
@@ -255,6 +240,23 @@ def help(func=None, file=stderr, param_types=dict()):
     
     if not summary and not params and not body:
         print("No parameters", file=file)
+
+def splitdoc(doc):
+    """Returns a tuple (summary, body) for a docstring
+    
+    The summary corresponds to the first line. Either item may be None if not
+    present."""
+    
+    if doc is None:
+        return (None, None)
+    
+    lines = doc.split("\n", 2)
+    if len(lines) > 1 and lines[1]:  # Second line exists but is not blank
+        return (None, doc)
+    
+    if len(lines) < 3:
+        return (lines[0], None)
+    return (lines[0], lines[2])
 
 def print_params(params, file, defaults, types, normal, noarg):
     for param in params:
