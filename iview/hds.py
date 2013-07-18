@@ -23,7 +23,7 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
         
         headers = dict(req.header_items())
         try:
-            return self.open1(req, headers)
+            return self.open_existing(req, headers)
         except http.client.BadStatusLine as err:
             # If the server closed the connection before receiving our reply,
             # the "http.client" module raises an exception with the "line"
@@ -31,9 +31,10 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
             if err.line != repr(""):
                 raise
         self.connection.close()
-        return self.open1(req)
+        return self.open_existing(req)
     
-    def open1(self, req, headers):
+    def open_existing(self, req, headers):
+        """Make a request using any existing connection"""
         self.connection.request(req.get_method(), req.selector, req.data,
             headers)
         response = self.connection.getresponse()
