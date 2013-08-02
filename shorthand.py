@@ -5,7 +5,7 @@ import os
 from types import MethodType
 from functools import partial
 from collections import namedtuple
-from misc import deco_factory
+from misc import decorator
 
 try:
     import builtins
@@ -39,9 +39,14 @@ def strip(s, start="", end=""):
             "String not enclosed by {0!r} and {1!r}".format(start, end))
     return s[len(start):len(s) - len(end)]
 
-@deco_factory
-def fields(f, *args, **kw):
-    "Decorator factory to add arbitrary fields to function object"
+@decorator
+def attributes(f, *args, **kw):
+    """Decorator to add arbitrary attributes to a function object
+    
+    Example:
+        @attributes(key="value")
+        def function(): ...
+    """
     f.__dict__.update(*args, **kw)
     return f
 

@@ -126,9 +126,36 @@ wrap_import()
 
 from urllib.parse import (urlsplit, urlunsplit)
 
-class deco_factory(WrapperFunction):
-    """Decorator to create a decorator factory given a function taking the
-    factory input and the object to be decorated"""
+class decorator(WrapperFunction):
+    """Decorator to help create other decorators
+    
+    This can be used to create simple decorators that accept arguments:
+    
+        @decorator
+        def arg_decorator(func, param): return implementation(func, param)
+        
+        @arg_decorator("arg")
+        def func(): ...
+    
+    is equivalent to
+    
+        def func(): ...
+        func = implementation(func, "arg")
+    
+    This can also be used to create wrapper decorators:
+    
+        @decorator
+        def wrapper(func, *args): return implementation(func, *args)
+        
+        @wrapper
+        def func(param): ...
+        
+        func("arg")
+    
+    is equivalent to
+    
+        implementation(func, "arg")"""
+    
     def __call__(self, *args, **kw):
         return partial(self.__wrapped__, *args, **kw)
 

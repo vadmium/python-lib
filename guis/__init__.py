@@ -1,8 +1,8 @@
 from misc import Function
 from types import MethodType
-from misc import deco_factory
+from misc import decorator
 
-@deco_factory
+@decorator
 def stash(stash, *args, **kw):
     stash(*args, **kw)
     return args[-1]
