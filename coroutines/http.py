@@ -10,7 +10,7 @@ from coroutines import task
 import coroutines
 import email.parser
 
-class HTTPConnection(object):
+class HTTPConnection:
     def __init__(self, sock):
         self.sock = sock
         self.requests = coroutines.Queue()
@@ -176,7 +176,7 @@ class HTTPConnection(object):
         raise StopIteration(ChunkedResponse(status, reason, msg, self.sock,
             parser))
 
-class HTTPResponse(object):
+class HTTPResponse:
     def __init__(self, status, reason, msg):
         self.status = int(status)
         self.reason = reason.decode("latin-1")
@@ -264,7 +264,7 @@ class ChunkedResponse(HTTPResponse):
         
         yield parser.headers()
 
-class Parser(object):
+class Parser:
     """
     "c" may hold last read character; empty string at EOF
     "eol" may ...
