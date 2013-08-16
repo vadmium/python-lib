@@ -12,6 +12,7 @@ from functools import partial
 from . import (Form, Section, Field, Inline)
 from . import (Entry, Button, List, Tree, MenuEntry)
 from . import stash
+from tkwrap import grid_row
 
 class Ttk(object):
     def __init__(self):
@@ -283,7 +284,7 @@ class Ttk(object):
                     target.widget.grid(column=level, columnspan=span,
                         sticky=sticky)
                     if multiline:
-                        row = target.widget.grid_info()["row"]
+                        row = grid_row(target.widget)
                         form.master.rowconfigure(row, weight=1)
             
             return focussed

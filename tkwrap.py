@@ -24,7 +24,7 @@ class Form(object):
         
         label = Label(self.master, **kw)
         label.grid(column=self.column + 0, sticky=label_sticky)
-        row = label.grid_info()["row"]
+        row = grid_row(label)
         if multiline:
             self.master.rowconfigure(row, weight=1)
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
@@ -193,3 +193,12 @@ def font_size(size):
         return -size
     else:
         return "{}p".format(size)
+
+def grid_row(widget):
+    """Workaround for Issue 16809: "Tk 8.6.0 introduces TypeError"
+    http://bugs.python.org/issue16809"""
+    
+    grid = widget.tk.splitlist(str(widget.tk.call("grid", "info", widget)))
+    for i in range(0, len(grid), 2):
+        if grid[i + 0] == "-row":
+            return grid[i + 1]
