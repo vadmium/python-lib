@@ -5,14 +5,16 @@ import os
 from types import MethodType
 from functools import partial
 
-class Function(object):
-    def __init__(self, name=None):
-        # By default, name the function after its class
-        self.__name__ = name or type(self).__name__
+class Bindable(object):
     def __get__(self, obj, cls=None):
         if obj is None:
             return self
         return MethodType(self, obj)
+
+class Function(Bindable):
+    def __init__(self, name=None):
+        # By default, name the function after its class
+        self.__name__ = name or type(self).__name__
 
 class WrapperFunction(Function):
     from functools import (update_wrapper, WRAPPER_ASSIGNMENTS)
@@ -147,17 +149,21 @@ class decorator(WrapperFunction):
         @decorator
         def wrapper(func, *args): return implementation(func, *args)
         
-        @wrapper
-        def func(param): ...
+        class C:
+            @wrapper
+            def method(self, param): ...
         
-        func("arg")
+        C().method("arg")
     
     is equivalent to
     
-        implementation(func, "arg")"""
+        implementation(C.method, C(), "arg")"""
     
     def __call__(self, *args, **kw):
-        return partial(self.__wrapped__, *args, **kw)
+        return BindingPartial(self.__wrapped__, *args, **kw)
+
+class BindingPartial(partial, Bindable):
+    pass
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
