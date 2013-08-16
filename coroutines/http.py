@@ -6,28 +6,27 @@ API modelled around the built-in "http.client" package
 
 from http.client import (
     UnknownTransferEncoding, BadStatusLine, UnknownProtocol, HTTPException)
-import eventgen
+from coroutines import task
+import coroutines
 import email.parser
 
 class HTTPConnection(object):
     def __init__(self, sock):
         self.sock = sock
-        self.requests = eventgen.Queue()
+        self.requests = coroutines.Queue()
         self.request_handler = self.RequestHandler()
     
     def close(self):
         self.request_handler.close()
         self.sock.close()
     
-    @eventgen.routine
+    @task
     def RequestHandler(self):
         while True:
-            if not self.requests:
-                yield self.requests
-            yield next(self.requests)
+            yield (yield self.requests.get())
     
     def request(self, method, hostname, path):
-        self.requests.send(self.Request(method, hostname, path))
+        self.requests.put_nowait(self.Request(method, hostname, path))
     
     def Request(self, method, hostname, path):
         yield self.sock.send(method.encode())
@@ -259,10 +258,10 @@ class ChunkedResponse(HTTPResponse):
                 yield self.after_eol()
             
             if not size:
-                yield eventgen.Yield((0, b""))
+                yield coroutines.Yield((0, b""))
                 break
             
-            yield eventgen.Yield((size, parser.c))
+            yield coroutines.Yield((size, parser.c))
             
             yield parser.next_char()
         else:
