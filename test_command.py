@@ -32,8 +32,8 @@ def help(self):
     self.assertEqual(capture.getvalue(), """\
 Summary line
 
-Parameters: [-mand] <str> [[-defnone] <str>] [-noarg] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
-Defaults: -optzero=0
+parameters: [-mand] <str> [[-defnone] <str>] [-noarg] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
+defaults: -optzero=0
 
 Docstring body
 """)

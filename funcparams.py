@@ -193,7 +193,7 @@ def help(func=None, file=stderr, param_types=dict()):
     if params:
         if summary:
             print(file=file)
-        file.write("Parameters:")
+        file.write("parameters:")
         print_params(argspec.args, file, defaults, param_types,
             normal="[{param}] <{value}>",
             noarg="{param}",
@@ -227,7 +227,7 @@ def help(func=None, file=stderr, param_types=dict()):
                 continue
             
             if first:
-                file.write("\n" "Defaults:")
+                file.write("\n" "defaults:")
                 first = False
             file.write(" {}={!s}".format(option(param), default))
         
@@ -239,7 +239,7 @@ def help(func=None, file=stderr, param_types=dict()):
         print(body, file=file)
     
     if not summary and not params and not body:
-        print("No parameters", file=file)
+        print("no parameters", file=file)
 
 def splitdoc(doc):
     """Returns a tuple (summary, body) for a docstring
