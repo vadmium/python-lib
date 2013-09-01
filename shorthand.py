@@ -65,3 +65,10 @@ def itemkey(item):
 
 def bitmask(size):
     return ~(~0 << size)
+
+def setitem(dict, key):
+    """Decorator that adds the definition to a dictionary with a given key"""
+    def decorator(define):
+        dict[key] = define
+        return define
+    return decorator
