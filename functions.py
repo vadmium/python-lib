@@ -4,6 +4,7 @@ import sys
 import weakref
 from types import MethodType
 from functools import partial
+from operator import methodcaller
 
 class Bindable(object):
     def __get__(self, obj, cls=None):
@@ -134,3 +135,5 @@ def setitem(dict, key):
         dict[key] = define
         return define
     return decorator
+
+instantiated = methodcaller("__call__")

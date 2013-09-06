@@ -1,4 +1,5 @@
 from io import BufferedIOBase
+from functions import instantiated
 
 class TeeWriter(BufferedIOBase):
     def __init__(self, *outputs):
@@ -15,10 +16,10 @@ class TeeWriter(BufferedIOBase):
         for output in self.outputs:
             output.write(b)
 
-class NullWriter(BufferedIOBase):
+@instantiated
+class dummywriter(BufferedIOBase):
     def write(self, b):
         pass
-nullwriter = NullWriter()
 
 def streamcopy(input, output, length):
     if length < 0:
