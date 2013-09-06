@@ -4,22 +4,61 @@ import sys
 from collections import Set
 import inspect
 from sys import stderr
-from inspect import signature, Parameter
 from functions import setitem
 from collections import OrderedDict
 
-try:
-    from inspect import getfullargspec
-except ImportError:
-    from inspect import getargspec
+try:  # Python 3.3
+    from inspect import signature, Parameter
+except ImportError:  # Python < 3.3
     from collections import namedtuple
-    FullArgSpec = namedtuple("FullArgSpec", """
-        args, varargs, varkw, defaults,
-        kwonlyargs, kwonlydefaults, annotations""")
-    def getfullargspec(*pos, **kw):
-        argspec = getargspec(*pos, **kw)
-        return FullArgSpec(*argspec,
-            kwonlyargs=(), kwonlydefaults=None, annotations=None)
+    
+    try:  # Python 3
+        from inspect import getfullargspec
+    except ImportError:  # Python < 3
+        from inspect import getargspec
+        FullArgSpec = namedtuple("FullArgSpec", """
+            args, varargs, varkw, defaults,
+            kwonlyargs, kwonlydefaults, annotations""")
+        def getfullargspec(*pos, **kw):
+            argspec = getargspec(*pos, **kw)
+            return FullArgSpec(*argspec,
+                kwonlyargs=(), kwonlydefaults=None, annotations=None)
+    
+    class signature:
+        def __init__(self, func):
+            argspec = getfullargspec(func)
+            self.parameters = OrderedDict()
+            defaults_start = -len(argspec.defaults or ())
+            for (i, name) in enumerate(argspec.args, -len(argspec.args)):
+                if i < defaults_start:
+                    default = Parameter.empty
+                else:
+                    default = argspec.defaults[i]
+                self.parameters[name] = Parameter(name,
+                    Parameter.POSITIONAL_OR_KEYWORD, default)
+            if argspec.varargs is not None:
+                self.parameters[argspec.varargs] = Parameter(argspec.varargs,
+                    Parameter.VAR_POSITIONAL, None)
+            for name in argspec.kwonlyargs:
+                default = argspec.kwonlydefaults.get(name, Parameter.empty)
+                self.parameters[name] = Parameter(name,
+                    Parameter.KEYWORD_ONLY, default)
+            if argspec.varkw is not None:
+                self.parameters[argspec.varkw] = Parameter(argspec.varkw,
+                    Parameter.VAR_KEYWORD, None)
+            
+            self.func = func  # Get signature.bind() partially working
+        
+        def bind(self, *pos, **kw):
+            inspect.getcallargs(self.func, *pos, **kw)
+    
+    Parameter = namedtuple("Parameter", "name, kind, default")
+    for name in (
+        "POSITIONAL_ONLY", "POSITIONAL_OR_KEYWORD", "VAR_POSITIONAL",
+        "KEYWORD_ONLY", "VAR_KEYWORD",
+        "empty",
+    ):
+        setattr(Parameter, name, object())
 
 try:
     from collections import ChainMap
