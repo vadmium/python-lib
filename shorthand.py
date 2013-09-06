@@ -1,9 +1,3 @@
-import sys
-import weakref
-from os.path import basename
-import os
-from types import MethodType
-from functools import partial
 from collections import namedtuple
 
 try:

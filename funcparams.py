@@ -60,9 +60,9 @@ except ImportError:  # Python < 3.3
     ):
         setattr(Parameter, name, object())
 
-try:
+try:  # Python 3.3
     from collections import ChainMap
-except ImportError:
+except ImportError:  # Python < 3.3
     from collections import Mapping
     class ChainMap(Mapping):
         def __init__(self, *maps):
