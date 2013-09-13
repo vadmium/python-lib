@@ -3,7 +3,7 @@
 import sys
 from io import StringIO
 from unittest import (TestCase, TestSuite)
-from misc import decorator
+from functions import decorator
 from funcparams import command
 import funcparams
 

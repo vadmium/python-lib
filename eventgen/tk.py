@@ -4,7 +4,7 @@ from math import ceil
 from . import (FileEvent as BaseFileEvent, Event)
 from collections import namedtuple
 from . import Send
-from misc import weakmethod
+from functions import weakmethod
 from warnings import warn
 
 # Another potential API implementation

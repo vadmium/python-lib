@@ -12,11 +12,11 @@ http://www.weightless.io/
 """
 
 import weakref
-from misc import weakmethod
+from functions import weakmethod
 from sys import exc_info
 import sys
 from collections import deque
-from misc import WrapperFunction
+from functions import WrapperFunction
 from functools import partial
 from contextlib import contextmanager
 from traceback import extract_stack

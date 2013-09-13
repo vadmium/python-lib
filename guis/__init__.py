@@ -1,6 +1,6 @@
-from misc import Function
+from functions import Function
 from types import MethodType
-from misc import decorator
+from functions import decorator
 
 @decorator
 def stash(stash, *args, **kw):

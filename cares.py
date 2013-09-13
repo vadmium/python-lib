@@ -15,7 +15,7 @@ from ctypes import (
     byref, CFUNCTYPE, POINTER, Structure,
 )
 from misc import exc_sink
-from misc import weakmethod
+from functions import weakmethod
 from collections import namedtuple
 from socket import inet_ntop
 

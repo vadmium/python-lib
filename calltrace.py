@@ -6,7 +6,7 @@ from misc import wrap_import
 wrap_import()
 
 from sys import stderr
-from misc import (WrapperFunction, Function)
+from functions import (WrapperFunction, Function)
 from contextlib import contextmanager
 import inspect
 from types import (
