@@ -3,16 +3,16 @@
 import sys
 from io import StringIO
 from unittest import (TestCase, TestSuite)
-from misc import deco_factory
+from misc import decorator
 from funcparams import command
 import funcparams
 
-@deco_factory
+@decorator
 def suite_add(suite, Test):
     suite.addTest(Test())
     return Test
 
-@deco_factory
+@decorator
 def testfunc(func, base=TestCase):
     return type(func.__name__, (base,), dict(runTest=func))
 
