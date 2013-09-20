@@ -43,7 +43,7 @@ from commctrl import (LVN_ITEMCHANGED, LVIF_STATE, LVIF_TEXT)
 from win32con import ES_AUTOHSCROLL
 from functools import partial
 from . import (Form, Section, Field, Inline, Entry, Button, List)
-from . import stash
+from functions import setitem
 
 class Win(object):
     def __init__(self):
@@ -150,7 +150,7 @@ class Win(object):
     
     controls = dict()
     
-    @stash(controls.__setitem__, Entry)
+    @setitem(controls, Entry)
     class Entry(object):
         def init(gui, ctrl, parent):
             ctrl.place(gui)
@@ -174,7 +174,7 @@ class Win(object):
         def set(gui, ctrl, text):
             SetWindowText(ctrl.hwnd, text)
     
-    @stash(controls.__setitem__, Button)
+    @setitem(controls, Button)
     class Button(object):
         def init(gui, ctrl, parent):
             ctrl.parent = parent.hwnd
@@ -201,7 +201,7 @@ class Win(object):
             top += (height - ctrl.height) // 2
             MoveWindow(ctrl.hwnd, left, top, ctrl.width, ctrl.height, 1)
     
-    @stash(controls.__setitem__, List)
+    @setitem(controls, List)
     class List(object):
         def init(gui, ctrl, parent):
             ctrl.place(gui)
@@ -303,7 +303,7 @@ class Win(object):
         def iter(gui, ctrl):
             return iter(range(len(ctrl.items)))
     
-    @stash(controls.__setitem__, Form)
+    @setitem(controls, Form)
     class Form:
         def init(gui, ctrl, win):
             ctrl.fixed_height = 0
@@ -389,7 +389,7 @@ class Win(object):
                 group_height = y - group_top
                 MoveWindow(section.hwnd, 0, group_top, cx, group_height, 1)
     
-    @stash(controls.__setitem__, Inline)
+    @setitem(controls, Inline)
     class Inline:
         def init(gui, ctrl, parent):
             ctrl.height = 0

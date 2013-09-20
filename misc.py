@@ -1,7 +1,7 @@
 import sys
 from os.path import basename
 import os
-from functools import partial
+from functions import setitem
 from functions import Function, WrapperFunction
 
 def wrap_import():
@@ -44,37 +44,37 @@ class ImportWrapper(WrapperFunction):
         self.interested.remove(name)
         self.fixups[name](self, *pos, **kw)
     
-    @partial(fixups.__setitem__, "builtins")
-    def _(self, *pos, **kw):
+    @setitem(fixups, "builtins")
+    def fixup_builtins(self, *pos, **kw):
         try:
             self.__wrapped__("builtins", *pos, **kw)
         except ImportError:
             builtin = self.__wrapped__("__builtin__", *pos, **kw)
             sys.modules["builtins"] = builtin
     
-    @partial(fixups.__setitem__, "io")
-    def _(self, *pos, **kw):
+    @setitem(fixups, "io")
+    def fixup_io(self, *pos, **kw):
         io = self.__wrapped__("io", *pos, **kw)
         if not hasattr(io, "SEEK_CUR"):
             io.SEEK_CUR = self.__wrapped__("os", *pos, **kw).SEEK_CUR
     
-    @partial(fixups.__setitem__, "reprlib")
-    def _(self, *pos, **kw):
+    @setitem(fixups, "reprlib")
+    def fixup_reprlib(self, *pos, **kw):
         try:
             self.__wrapped__("reprlib", *pos, **kw)
         except ImportError:
             sys.modules["reprlib"] = self.__wrapped__("repr", *pos, **kw)
     
-    @partial(fixups.__setitem__, "types")
-    def _(self, *pos, **kw):
+    @setitem(fixups, "types")
+    def fixup_types(self, *pos, **kw):
         types = self.__wrapped__("types", *pos, **kw)
         if not hasattr(types, "InstanceType"):
             types.InstanceType = object
         if not hasattr(types, "ClassType"):
             types.ClassType = type
     
-    @partial(fixups.__setitem__, "urllib.parse")
-    def _(self, *pos, **kw):
+    @setitem(fixups, "urllib.parse")
+    def fixup_urlparse(self, *pos, **kw):
         try:
             urllib = self.__wrapped__("urllib.parse", *pos, **kw)
         except ImportError:

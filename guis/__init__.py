@@ -2,11 +2,6 @@ from functions import Function
 from types import MethodType
 from functions import decorator
 
-@decorator
-def stash(stash, *args, **kw):
-    stash(*args, **kw)
-    return args[-1]
-
 def probe():
     try:
         from .win import Win

@@ -11,7 +11,7 @@ import tkwrap
 from functools import partial
 from . import (Form, Section, Field, Inline)
 from . import (Entry, Button, List, Tree, MenuEntry)
-from . import stash
+from functions import setitem
 from tkwrap import grid_row
 
 class Ttk(object):
@@ -53,7 +53,7 @@ class Ttk(object):
     
     controls = dict()
     
-    @stash(controls.__setitem__, Entry)
+    @setitem(controls, Entry)
     class Entry(object):
         def init(gui, ctrl, window, master, focus=False, resize=False):
             ctrl.place(gui)
@@ -71,7 +71,7 @@ class Ttk(object):
             ctrl.widget.delete(0, tkinter.END)
             ctrl.widget.insert(0, text)
     
-    @stash(controls.__setitem__, Button)
+    @setitem(controls, Button)
     class Button(object):
         def init(gui, ctrl, window, master, focus=False, resize=False):
             if ctrl.default:
@@ -157,7 +157,7 @@ class Ttk(object):
         def iter(gui, ctrl):
             return iter(ctrl.widget.tree.get_children())
     
-    @stash(controls.__setitem__, List)
+    @setitem(controls, List)
     class List(TreeBase):
         def init(gui, *pos, **kw):
             return gui.TreeBase.init(gui, *pos, tree=False, **kw)
@@ -168,7 +168,7 @@ class Ttk(object):
         def get(gui, ctrl, item):
             return ctrl.widget.tree.item(item, option="values")
     
-    @stash(controls.__setitem__, Tree)
+    @setitem(controls, Tree)
     class Tree(TreeBase):
         def add(gui, ctrl, parent, text, *pos, **kw):
             if not parent:
@@ -183,7 +183,7 @@ class Ttk(object):
         def set(gui, ctrl, item, text):
             ctrl.widget.tree.item(item, text=text)
     
-    @stash(controls.__setitem__, MenuEntry)
+    @setitem(controls, MenuEntry)
     class MenuEntry(object):
         def init(gui, ctrl, window, master, focus, resize=False):
             ctrl.place(gui)
@@ -197,7 +197,7 @@ class Ttk(object):
         def get(gui, ctrl):
             return ctrl.var.get()
     
-    @stash(controls.__setitem__, Inline)
+    @setitem(controls, Inline)
     class Inline:
         def init(gui, ctrl, window, master, focus, resize=False):
             focussed = False
@@ -217,7 +217,7 @@ class Ttk(object):
                     ctrl.widget.columnconfigure(col, weight=1)
             return focussed
     
-    @stash(controls.__setitem__, Form)
+    @setitem(controls, Form)
     class Form:
         def init(gui, ctrl, window, master, focus, resize=False):
             ctrl.widget = ttk.Frame(master)
