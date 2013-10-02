@@ -2,8 +2,7 @@ from __future__ import print_function
 
 import sys
 from collections import Set
-from inspect import getcallargs
-from inspect import getdoc
+import inspect
 from sys import stderr
 from itertools import chain
 
@@ -82,8 +81,9 @@ def command(func=None, args=None, param_types=dict()):
     """
     # return value could be str or int -> System exit
     
-    (func, argspec, params, param_types, defaults) = inspect(
+    (func, argspec, params, param_types, defaults) = prepare(
         func, param_types)
+    
     if args is None:
         args = sys.argv[1:]
     
@@ -173,17 +173,17 @@ def command(func=None, args=None, param_types=dict()):
         return
     
     try:
-        getcallargs(func, *positional, **opts)
+        inspect.getcallargs(func, *positional, **opts)
     except TypeError as err:
         raise SystemExit(err)
     
     return func(*positional, **opts)
 
 def help(func=None, file=stderr, param_types=dict()):
-    (func, argspec, params, param_types, defaults) = inspect(
+    (func, argspec, params, param_types, defaults) = prepare(
         func, param_types)
     
-    (summary, body) = splitdoc(getdoc(func))
+    (summary, body) = splitdoc(inspect.getdoc(func))
     if summary:
         print(summary, file=file)
     
@@ -284,7 +284,7 @@ def option(param):
     else:
         return "-" + param
 
-def inspect(func, param_types):
+def prepare(func=None, param_types=dict()):
     if func is None:
         from __main__ import main as func
     
