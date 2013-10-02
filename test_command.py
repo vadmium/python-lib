@@ -66,7 +66,7 @@ def types(self):
     """Test argument types"""
     fixture = Fixture()
     fixture.f.param_types = dict(
-        {"*": float}, mand_opt=set, optzero=int, multi_opt=float)
+        var=float, mand_opt=set, optzero=int, multi_opt=float)
     command(fixture.f,
         "-mand-opt=hallo -optzero -12 -multi-opt=inf -multi-opt=01.0e+01 "
         "mand x x x -- 0 -1 +.625e-1".

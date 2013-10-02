@@ -4,7 +4,9 @@ import sys
 from collections import Set
 import inspect
 from sys import stderr
-from itertools import chain
+from inspect import signature, Parameter
+from functions import setitem
+from collections import OrderedDict
 
 try:
     from inspect import getfullargspec
@@ -81,16 +83,21 @@ def command(func=None, args=None, param_types=dict()):
     """
     # return value could be str or int -> System exit
     
-    (func, argspec, params, param_types, defaults) = prepare(
-        func, param_types)
+    (func, sig, keywords, param_types) = prepare(func, param_types)
+    varpos = param_kind(sig, Parameter.VAR_POSITIONAL)
+    varkw = param_kind(sig, Parameter.VAR_KEYWORD)
     
     if args is None:
         args = sys.argv[1:]
     
-    auto_help = (argspec.varkw is None and "help" not in params)
+    auto_help = varkw is None and "help" not in keywords
     if auto_help:
-        params.add("help")
-        defaults["help"] = False
+        param = Parameter("help", Parameter.KEYWORD_ONLY, default=False)
+        keywords[param.name] = param
+    
+    pos_kinds = (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+    pos_iter = (param for
+        param in sig.parameters.values() if param.kind in pos_kinds)
     
     positional = list()
     opts = dict()
@@ -119,15 +126,14 @@ def command(func=None, args=None, param_types=dict()):
                 arg = None
             
             opt = opt.replace("-", "_")
-            if opt in params:
-                key = opt
-            else:
-                if argspec.varkw is None:
+            param = keywords.get(opt)
+            if not param:
+                if varkw is None:
                     raise SystemExit("Unexpected option {opt!r}".
                         format(**locals()))
-                key = "**"
+                param = varkw
             
-            if noarg_default(defaults.get(key)):
+            if param.kind != param.VAR_KEYWORD and noarg_param(param):
                 if arg is not None:
                     raise SystemExit("Option {opt!r} takes no argument".
                         format(**locals()))
@@ -142,29 +148,26 @@ def command(func=None, args=None, param_types=dict()):
                             "argument".format(**locals()))
                 
                 try:
-                    convert = param_types[key]
+                    convert = param_types[param.name]
                 except LookupError:
                     pass
                 else:
                     arg = convert(arg)
                 
-                if multi_default(defaults.get(key)):
+                if param.kind != param.VAR_KEYWORD and multi_param(param):
                     opts.setdefault(opt, list()).append(arg)
                 else:
                     opts[opt] = arg
         
         else:
-            try:
-                key = argspec.args[len(positional)]
-            except LookupError:
-                key = "*"
-            
-            try:
-                convert = param_types[key]
-            except LookupError:
-                pass
-            else:
-                arg = convert(arg)
+            param = next(pos_iter, varpos)
+            if param is not None:
+                try:
+                    convert = param_types[param.name]
+                except LookupError:
+                    pass
+                else:
+                    arg = convert(arg)
             
             positional.append(arg)
     
@@ -173,72 +176,48 @@ def command(func=None, args=None, param_types=dict()):
         return
     
     try:
-        inspect.getcallargs(func, *positional, **opts)
+        sig.bind(*positional, **opts)
     except TypeError as err:
         raise SystemExit(err)
     
     return func(*positional, **opts)
 
 def help(func=None, file=stderr, param_types=dict()):
-    (func, argspec, params, param_types, defaults) = prepare(
-        func, param_types)
+    (func, sig, keywords, param_types) = prepare(func, param_types)
     
     (summary, body) = splitdoc(inspect.getdoc(func))
     if summary:
         print(summary, file=file)
     
-    params = (params or
-        argspec.varargs is not None or argspec.varkw is not None)
-    
-    if params:
+    if sig.parameters:
         if summary:
             print(file=file)
         file.write("parameters:")
-        print_params(argspec.args, file, defaults, param_types,
-            normal="[{param}] <{value}>",
-            noarg="{param}",
-        )
-        if argspec.varargs is not None:
-            value = argspec.varargs
-            try:
-                type = param_types["*"]
-            except LookupError:
-                pass
-            else:
-                value = "{value}: {type.__name__}".format(**locals())
-            file.write(" [<{value}> . . .]".format(**locals()))
-        print_params(argspec.kwonlyargs, file, defaults, param_types,
-            normal="{param}=<{value}>",
-            noarg="{param}",
-        )
-        if argspec.varkw is not None:
-            type = param_types.get("**", str).__name__
-            file.write(" [{}=<{}> . . .]".format(
-                option(argspec.varkw), type))
+        
+        for param in sig.parameters.values():
+            param = format_kind[param.kind](param, param_types)
+            file.writelines((" ", param))
         
         first = True
-        for param in chain(argspec.args, argspec.kwonlyargs):
-            try:
-                default = defaults[param]
-            except LookupError:
-                continue
-            if (default is None or
-            noarg_default(default) or multi_default(default)):
+        # TODO: Include positional-only parameters
+        for param in keywords.values():
+            if (param.default in (Parameter.empty, None) or
+            noarg_param(param) or multi_param(param)):
                 continue
             
             if first:
                 file.write("\n" "defaults:")
                 first = False
-            file.write(" {}={!s}".format(option(param), default))
+            file.write(" {}={!s}".format(option(param.name), param.default))
         
         print(file=file)
     
     if body is not None:
-        if summary or params:
+        if summary or sig.parameters:
             print(file=file)
         print(body, file=file)
     
-    if not summary and not params and not body:
+    if not summary and not sig.parameters and not body:
         print("no parameters", file=file)
 
 def splitdoc(doc):
@@ -258,24 +237,51 @@ def splitdoc(doc):
         return (lines[0], None)
     return (lines[0], lines[2])
 
-def print_params(params, file, defaults, types, normal, noarg):
-    for param in params:
-        value = types.get(param, str).__name__
-        try:
-            default = defaults[param]
-        except LookupError:
-            format = normal
-        else:
-            if noarg_default(default):
-                format = noarg
-            else:
-                format = normal
-            if multi_default(default):
-                format = "{format} . . .".format(**locals())
-            format = "[{format}]".format(**locals())
-        
-        param = option(param)
-        file.writelines((" ", format.format(param=param, value=value)))
+format_kind = dict()
+
+@setitem(format_kind, Parameter.POSITIONAL_ONLY)
+def format_pos(param, types):
+    res = format_pos_single(param, types)
+    if param.default is not param.empty:
+        res = "[" + res + "]"
+    return res
+
+@setitem(format_kind, Parameter.VAR_POSITIONAL)
+def format_varpos(param, types):
+    return "[" + format_pos_single(param, types) + " . . .]"
+
+def format_pos_single(param, types):
+    try:
+        res = "{}: {}".format(param.name, types[param.name].__name__)
+    except (LookupError, AttributeError):
+        res = param.name
+    return "<" + res + ">"
+
+@setitem(format_kind, Parameter.POSITIONAL_OR_KEYWORD)
+def format_pos_kw(param, types):
+    return format_kw_infer(param, types, "[{param}] <{value}>", "{param}")
+
+@setitem(format_kind, Parameter.KEYWORD_ONLY)
+def format_kw(param, types):
+    return format_kw_infer(param, types, "{param}=<{value}>", "{param}")
+
+@setitem(format_kind, Parameter.VAR_KEYWORD)
+def format_varkw(param, types):
+    return format_kw_format(param, types, "[{param}=<{value}> . . .]")
+
+def format_kw_infer(param, types, format, noarg):
+    if param.default is not param.empty:
+        if noarg_param(param):
+            format = noarg
+        if multi_param(param):
+            format = "{format} . . .".format(**locals())
+        format = "[{format}]".format(**locals())
+    return format_kw_format(param, types, format)
+
+def format_kw_format(param, types, format):
+    value = types.get(param.name, str).__name__
+    param = option(param.name)
+    return format.format(param=param, value=value)
 
 def option(param):
     param = param.replace("_", "-")
@@ -288,37 +294,27 @@ def prepare(func=None, param_types=dict()):
     if func is None:
         from __main__ import main as func
     
-    argspec = getfullargspec(func)
+    sig = signature(func)
     
-    if argspec.defaults is None:
-        defaults = dict()
-    else:
-        defaults = len(argspec.args) - len(argspec.defaults)
-        defaults = dict(zip(argspec.args[defaults:], argspec.defaults))
-    if argspec.kwonlydefaults is not None:
-        defaults.update(argspec.kwonlydefaults)
+    keyword_kinds = (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
+    keywords = OrderedDict((param.name, param) for
+        param in sig.parameters.values() if param.kind in keyword_kinds)
     
     param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
-    
-    params = set().union(argspec.args, argspec.kwonlyargs)
     for param in param_types:
-        if param == "*":
-            if argspec.varargs is None:
-                raise TypeError("{func.__name__}() does not take "
-                    "variable positional arguments (*)".format(**locals()))
-        elif param == "**":
-            if argspec.varkw is None:
-                raise TypeError("{func.__name__}() does not take "
-                    "variable keyword arguments (**)".format(**locals()))
-        else:
-            if param not in params:
-                raise TypeError("{func.__name__}() does not have "
-                    "a parameter called {param!r}".format(**locals()))
+        if param not in sig.parameters:
+            raise TypeError("{func.__name__}() does not have "
+                "a parameter called {param!r}".format(**locals()))
     
-    return (func, argspec, params, param_types, defaults)
+    return (func, sig, keywords, param_types)
+
+def param_kind(sig, kind):
+    return next(iter(param for
+        param in sig.parameters.values() if param.kind == kind), None)
 
 # Infer parameter modes from default values
-def noarg_default(default):
-    return default is False
-def multi_default(default):
-    return isinstance(default, (tuple, list, Set)) and not default
+def noarg_param(param):
+    return param.default is False
+def multi_param(param):
+    return (isinstance(param.default, (tuple, list, Set)) and
+        not param.default)
