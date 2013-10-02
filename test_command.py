@@ -29,14 +29,14 @@ def help(self):
     funcparams.help(Fixture().f, capture)
     
     self.maxDiff = None
-    self.assertEqual(capture.getvalue(), """\
+    self.assertEqual("""\
 Summary line
 
 parameters: [-mand] <str> [[-defnone] <str>] [-noarg] [[-multi] <str> . . .] [<var> . . .] -mand-opt=<str> [-optzero=<str>] [-noarg-opt] [-multi-opt=<str> . . .]
 defaults: -optzero=0
 
 Docstring body
-""")
+""", capture.getvalue())
 
 @suite_add(suite)
 @testfunc()
@@ -44,8 +44,8 @@ def positional(self):
     """Test function is called correctly"""
     fixture = Fixture()
     command(fixture.f, "em -mand-opt emo".split())
-    self.assertEqual(fixture.values, dict(fixture.defaults,
-        mand="em", mand_opt="emo"))
+    self.assertEqual(dict(fixture.defaults, mand="em", mand_opt="emo"),
+        fixture.values)
 
 @suite_add(suite)
 @testfunc()
@@ -55,10 +55,10 @@ def options(self):
         "-mand=em -defnone=dee -noarg -multi m1 "
         "-mand-opt=emo -multi=m2 -optzero ozed -multi-opt mo1 -noarg-opt".
     split())
-    self.assertEqual(fixture.values, dict(fixture.defaults,
+    self.assertEqual(dict(fixture.defaults,
         mand="em", defnone="dee", noarg=True, multi=["m1", "m2"],
         mand_opt="emo", optzero="ozed", multi_opt=["mo1"], noarg_opt=True,
-    ))
+    ), fixture.values)
 
 @suite_add(suite)
 @testfunc()
@@ -72,11 +72,11 @@ def types(self):
         "mand x x x -- 0 -1 +.625e-1".
     split())
     
-    self.assertEqual(fixture.values["mand"], "mand")
-    self.assertEqual(fixture.values["var"], (0, -1, 0.0625))
-    self.assertEqual(fixture.values["mand_opt"], set("halo"))
-    self.assertEqual(fixture.values["optzero"], -12)
-    self.assertEqual(fixture.values["multi_opt"], [float("inf"), 10])
+    self.assertEqual("mand", fixture.values["mand"])
+    self.assertEqual((0, -1, 0.0625), fixture.values["var"])
+    self.assertEqual(set("halo"), fixture.values["mand_opt"])
+    self.assertEqual(-12, fixture.values["optzero"])
+    self.assertEqual([float("inf"), 10], fixture.values["multi_opt"])
 
 @suite_add(suite)
 @testfunc()
@@ -108,8 +108,8 @@ def frozen(self):
     args = "7 42".split()
     param_types = dict(b=int)
     command(f, args, param_types=param_types)
-    self.assertEqual(args, "7 42".split())
-    self.assertEqual(param_types, dict(b=int))
+    self.assertEqual("7 42".split(), args)
+    self.assertEqual(dict(b=int), param_types)
 
 # Test variable arguments
 # Test variable keyword arguments
