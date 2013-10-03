@@ -186,12 +186,7 @@ def command(func=None, args=None, param_types=dict()):
                         raise SystemExit("Option {opt!r} requires an "
                             "argument".format(**locals()))
                 
-                try:
-                    convert = param_types[param.name]
-                except LookupError:
-                    pass
-                else:
-                    arg = convert(arg)
+                arg = convert(param_types, param, arg)
                 
                 if param.kind != param.VAR_KEYWORD and multi_param(param):
                     opts.setdefault(opt, list()).append(arg)
@@ -201,13 +196,7 @@ def command(func=None, args=None, param_types=dict()):
         else:
             param = next(pos_iter, varpos)
             if param is not None:
-                try:
-                    convert = param_types[param.name]
-                except LookupError:
-                    pass
-                else:
-                    arg = convert(arg)
-            
+                arg = convert(param_types, param, arg)
             positional.append(arg)
     
     if auto_help and opts.get("help", False):
@@ -220,6 +209,15 @@ def command(func=None, args=None, param_types=dict()):
         raise SystemExit(err)
     
     return func(*positional, **opts)
+
+def convert(types, param, arg):
+    convert = types.get(param.name)
+    if not convert:
+        return arg
+    try:
+        return convert(arg)
+    except ValueError as err:
+        raise SystemExit("{!r} parameter: {}".format(param.name, err))
 
 def help(func=None, file=stderr, param_types=dict()):
     (func, sig, keywords, param_types) = prepare(func, param_types)
