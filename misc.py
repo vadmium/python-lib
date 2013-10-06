@@ -106,29 +106,41 @@ def gen_repr(gi):
         return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
 
-def transplant(path, old="/", new=""):
-    path_dirs = path_split(path)
-    for root_dir in path_split(old):
-        try:
-            path_dir = next(path_dirs)
-        except StopIteration:
-            if not path and root_dir == "/":
-                raise ValueError("Null path not relative to {0}".format(old))
-            else:
-                raise ValueError(
-                    "{0} is an ancestor of {1}".format(path, old))
-        if path_dir != root_dir:
-            raise ValueError("{0} is not relative to {1}".format(path, old))
+def relpath(path, start=""):
+    """Converts an OS path string to an OS independent path tuple
     
-    return os.path.join(new, "/".join(path_dirs))
+    The given path must be relative to the starting directory."""
+    
+    p = parsepath(path)
+    s = parsepath(os.path.normcase(start))
+    startlen = len(s)
+    if (len(p) < startlen or
+    any(os.path.normcase(p) != s for (p, s) in zip(p[:startlen], s))):
+        fmt = "Path {!r} does not start with {!r}"
+        raise ValueError(fmt.format(path, start))
+    return p[startlen:]
 
-def path_split(path):
-    if os.path.isabs(path):
-        yield "/"
+def parsepath(path):
+    """Returns a tuple (root, dir, subdir, . . ., file)
     
-    for component in path.split("/"):
-        if component:
-            yield component
+    The "root" element is always present. It is an empty string when a
+    relative path is given. The other elements may be missing if the path
+    was simply the root element (or empty)."""
+    
+    # Strip any trailing slashes not part of the root
+    (head, tail) = os.path.split(path)
+    if not tail:
+        path = head
+    
+    parts = list()
+    while True:
+        (path, tail) = os.path.split(path)
+        if not tail:
+            break
+        parts.append(tail)
+    parts.append(path)
+    parts.reverse()
+    return tuple(parts)
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
