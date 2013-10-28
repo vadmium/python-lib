@@ -360,17 +360,34 @@ def main():
     import importlib
     from types import ModuleType
     
+    if len(sys.argv) < 2 or sys.argv[1] in {"-help", "--help", "-h"}:
+        print("""\
+Calls a function from a Python module
+
+parameters: <module>[.function] [arguments | -help]
+
+If the function name is omitted, the main() function is called.""")
+        return
+    
     name = sys.argv[1]
+    
     (module, sep, attr) = name.rpartition(".")
-    if sep:
-        func = getattr(importlib.import_module(module), attr, None)
-    else:
-        func = None
-    if func is None:
-        func = importlib.import_module(name)
+    try:
+        if sep:
+            func = getattr(importlib.import_module(module), attr, None)
+        else:
+            func = None
+        if func is None:
+            func = importlib.import_module(name)
+    except ImportError as err:
+        raise SystemExit(err)
+    
     if isinstance(func, ModuleType):
-        func = getattr(func, "main")
-    command(func, sys.argv[2:])
+        func = getattr(func, "main", None)
+        if func is None:
+            raise SystemExit("Module {} has no main() function".format(name))
+    
+    return command(func, sys.argv[2:])
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
