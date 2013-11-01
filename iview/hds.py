@@ -3,6 +3,26 @@ from http.client import HTTPConnection
 import http.client
 
 class PersistentConnectionHandler(urllib.request.BaseHandler):
+    """URL handler for HTTP persistent connections
+    
+    connection = PersistentConnectionHandler()
+    session = urllib.request.build_opener(connection)
+    
+    # First request opens connection
+    with session.open("http://localhost/one") as response:
+        response.read()
+    
+    # Subsequent requests reuse the existing connection, unless it got closed
+    with session.open("http://localhost/two") as response:
+        response.read()
+    
+    # Closes old connection when new host specified
+    with session.open("http://example/three") as response:
+        response.read()
+    
+    connection.close()  # Frees socket
+    """
+    
     def __init__(self, *pos, **kw):
         self.type = None
         self.host = None
@@ -31,7 +51,7 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
             if err.line != repr(""):
                 raise
         self.connection.close()
-        return self.open_existing(req)
+        return self.open_existing(req, headers)
     
     def open_existing(self, req, headers):
         """Make a request using any existing connection"""
