@@ -274,15 +274,11 @@ class Select(Event):
     def block(self, callback):
         Event.block(self, callback)
         try:
-            for e in self.set:
+            for (i, e) in enumerate(self.set):
                 e.event.block(e.trigger)
         except:
-            i = iter(self.set)
-            while True:
-                ee = next(i)
-                if ee is e:
-                    break
-                ee.close()
+            for e in self.set[:i]:
+                e.event.close()
             raise
     
     def close(self):
