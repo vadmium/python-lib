@@ -99,7 +99,6 @@ class Thread(object):
     
     def trampoline(self, result):
         tb = None  # For seamless deletion at end
-        self.event = None  # Create attribute and mark not active
         
         try:
             while self.routines:
@@ -136,8 +135,7 @@ class Thread(object):
                 self.result = result
             else:
                 result.default()
-            for r in self.reapers:
-                r()
+            self.close()
         
         finally:
             # Break circular reference if traceback includes this function
@@ -145,11 +143,12 @@ class Thread(object):
             del result
     
     def close(self):
-        if self.event:
+        if self.routines:
             self.event.close()
-            self.event = None
-        while self.routines:
-            self.routines.pop().close()
+            while self.routines:
+                self.routines.pop().close()
+        while self.reapers:
+            self.reapers.pop()()
     
     def __del__(self):
         if self.routines:
