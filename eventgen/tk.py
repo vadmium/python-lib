@@ -7,23 +7,6 @@ from . import Send
 from functions import weakmethod
 from warnings import warn
 
-# Another potential API implementation
-if False:
-    from types import MethodType
-    class MethodClass(type):
-        def __get__(self, obj, cls):
-            if obj is None:
-                return self
-            return MethodType(self, obj)
-    class EventDriver(object):
-        def __init__(self, widget):
-            self.widget = widget
-        class FileEvent(..., metaclass=MethodClass):
-            def __init__(self, parent, *_, **__):
-                ...(parent.widget)
-            ...
-        ...
-
 def Driver(widget):
     # Create subclasses with "widget" as a member that inherit from the
     # driver classes defined below

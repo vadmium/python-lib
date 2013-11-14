@@ -22,6 +22,11 @@ from contextlib import contextmanager
 from traceback import extract_stack
 from warnings import warn
 
+try:  # Python 3.2
+    ResourceWarning
+except NameError:  # Python < 3.2
+    ResourceWarning = Warning
+
 class Send(object):
     def __init__(self, value=None):
         self.value = value
