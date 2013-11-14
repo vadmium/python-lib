@@ -59,6 +59,9 @@ class ImportWrapper(WrapperFunction):
     for (new, old) in (
         ("builtins", "__builtin__"),
         ("reprlib", "repr"),
+        ("tkinter", "Tkinter"),
+        ("tkinter.filedialog", "tkFileDialog"),
+        ("tkinter.ttk", "ttk"),
         ("urllib.parse", "urlparse"),
     ):
         fixups[new] = partial(fixup_rename, new, old)
