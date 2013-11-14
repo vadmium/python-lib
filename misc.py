@@ -3,6 +3,7 @@ from os.path import basename
 import os
 from functions import setitem
 from functions import Function, WrapperFunction
+from functools import partial
 
 def wrap_import():
     global installed_wrapper
@@ -44,26 +45,29 @@ class ImportWrapper(WrapperFunction):
         self.interested.remove(name)
         self.fixups[name](self, *pos, **kw)
     
-    @setitem(fixups, "builtins")
-    def fixup_builtins(self, *pos, **kw):
+    def fixup_rename(new, old, self, *pos, **kw):
         try:
-            self.__wrapped__("builtins", *pos, **kw)
+            self.__wrapped__(new, *pos, **kw)
         except ImportError:
-            builtin = self.__wrapped__("__builtin__", *pos, **kw)
-            sys.modules["builtins"] = builtin
+            module = self.__wrapped__(old, *pos, **kw)
+            (parent, sep, name) = new.partition(".")
+            if sep:
+                # Parent module (if any) should be imported despite error
+                setattr(sys.modules[parent], name, module)
+            sys.modules[new] = module
+    
+    for (new, old) in (
+        ("builtins", "__builtin__"),
+        ("reprlib", "repr"),
+        ("urllib.parse", "urlparse"),
+    ):
+        fixups[new] = partial(fixup_rename, new, old)
     
     @setitem(fixups, "io")
     def fixup_io(self, *pos, **kw):
         io = self.__wrapped__("io", *pos, **kw)
         if not hasattr(io, "SEEK_CUR"):
             io.SEEK_CUR = self.__wrapped__("os", *pos, **kw).SEEK_CUR
-    
-    @setitem(fixups, "reprlib")
-    def fixup_reprlib(self, *pos, **kw):
-        try:
-            self.__wrapped__("reprlib", *pos, **kw)
-        except ImportError:
-            sys.modules["reprlib"] = self.__wrapped__("repr", *pos, **kw)
     
     @setitem(fixups, "types")
     def fixup_types(self, *pos, **kw):
@@ -72,15 +76,6 @@ class ImportWrapper(WrapperFunction):
             types.InstanceType = object
         if not hasattr(types, "ClassType"):
             types.ClassType = type
-    
-    @setitem(fixups, "urllib.parse")
-    def fixup_urlparse(self, *pos, **kw):
-        try:
-            urllib = self.__wrapped__("urllib.parse", *pos, **kw)
-        except ImportError:
-            urlparse = self.__wrapped__("urlparse", *pos, **kw)
-            sys.modules["urllib"].parse = urlparse
-            sys.modules["urllib.parse"] = urlparse
 
 wrap_import()
 
