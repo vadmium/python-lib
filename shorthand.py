@@ -1,4 +1,5 @@
 from collections import namedtuple
+from contextlib import contextmanager
 
 try:
     import builtins
@@ -44,3 +45,12 @@ def itemkey(item):
 
 def bitmask(size):
     return ~(~0 << size)
+
+@contextmanager
+def substattr(obj, name, value):
+    orig = getattr(obj, name)
+    try:
+        setattr(obj, name, value)
+        yield value
+    finally:
+        setattr(obj, name, orig)
