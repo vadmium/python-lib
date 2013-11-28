@@ -1,6 +1,7 @@
 from urllib.parse import urlsplit, urlunsplit
 import urllib.parse
 from socketserver import BaseServer
+import sys
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -118,3 +119,11 @@ class Server(BaseServer):
             return super().serve_forever(*pos, **kw)
         finally:
             self.server_close()
+    
+    def handle_error(self, *pos, **kw):
+        [exc, *_] = sys.exc_info()
+        if issubclass(exc, ConnectionError):
+            return
+        if not issubclass(exc, Exception):
+            raise  # Force server loop to exit
+        super().handle_error(*pos, **kw)
