@@ -162,6 +162,12 @@ def url_port(url, scheme, ports):
     return dict(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
+def formataddr(address):
+    (host, port) = address
+    if ":" in host:
+        host = "[{}]".format(host)
+    return "{}:{}".format(host, port)
+
 class Context(object):
     def __enter__(self):
         return self
