@@ -24,40 +24,41 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
     """
     
     def __init__(self, *pos, **kw):
-        self.type = None
-        self.host = None
-        self.pos = pos
-        self.kw = kw
-        self.connection = None
+        self._type = None
+        self._host = None
+        self._pos = pos
+        self._kw = kw
+        self._connection = None
     
     def default_open(self, req):
         if req.type != "http":
             return None
         
-        if req.type != self.type or req.host != self.host:
-            if self.connection:
-                self.connection.close()
-            self.connection = HTTPConnection(req.host, *self.pos, **self.kw)
-            self.type = req.type
-            self.host = req.host
+        if req.type != self._type or req.host != self._host:
+            if self._connection:
+                self._connection.close()
+            self._connection = HTTPConnection(req.host,
+                *self._pos, **self._kw)
+            self._type = req.type
+            self._host = req.host
         
         headers = dict(req.header_items())
         try:
-            return self.open_existing(req, headers)
+            return self._openattempt(req, headers)
         except http.client.BadStatusLine as err:
-            # If the server closed the connection before receiving our reply,
-            # the "http.client" module raises an exception with the "line"
-            # attribute set to repr("")!
+            # If the server closed the connection before receiving this
+            # request, the "http.client" module raises an exception with the
+            # "line" attribute set to repr("")!
             if err.line != repr(""):
                 raise
-        self.connection.close()
-        return self.open_existing(req, headers)
+        self._connection.close()
+        return self._openattempt(req, headers)
     
-    def open_existing(self, req, headers):
-        """Make a request using any existing connection"""
-        self.connection.request(req.get_method(), req.selector, req.data,
+    def _openattempt(self, req, headers):
+        """Attempt a request using any existing connection"""
+        self._connection.request(req.get_method(), req.selector, req.data,
             headers)
-        response = self.connection.getresponse()
+        response = self._connection.getresponse()
         
         # Odd impedance mismatch between "http.client" and "urllib.request"
         response.msg = response.reason
@@ -65,8 +66,8 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
         return response
     
     def close(self):
-        if self.connection:
-            self.connection.close()
+        if self._connection:
+            self._connection.close()
     
     def __enter__(self):
         return self
