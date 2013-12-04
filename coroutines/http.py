@@ -26,6 +26,7 @@ class HTTPConnection:
             yield (yield self.requests.get())
     
     def request(self, method, hostname, path):
+        # TODO: limit the number of queued requests, or size of request queue
         self.requests.put_nowait(self.Request(method, hostname, path))
     
     def Request(self, method, hostname, path):
@@ -43,6 +44,8 @@ class HTTPConnection:
             b"Host: "
         )
         yield self.sock.send(hostname.encode())
+        # User-Agent: python-event-http
+        # X-Forwarded-For: . . .
         yield self.sock.send(b"\r\n"
             b"\r\n"
         )
