@@ -2,19 +2,21 @@ from functools import reduce
 from operator import or_
 from math import ceil
 from . import (FileEvent as BaseFileEvent, Event)
-from collections import namedtuple
 from . import Send
 from functions import weakmethod
 from warnings import warn
+from asyncio.base_events import BaseEventLoop
 
-def Driver(widget):
-    # Create subclasses with "widget" as a member that inherit from the
-    # driver classes defined below
-    return DriverType(
-        FileEvent=type(FileEvent.__name__, (FileEvent,), locals()),
-        Timer=type(Timer.__name__, (Timer,), locals()),
-    )
-DriverType = namedtuple(Driver.__name__, "FileEvent, Timer")
+class EventLoop(BaseEventLoop):
+    def call_soon(self, callback, *pos, **kw):
+        return callback(*pos, **kw)
+    
+    def __init__(self, widget):
+        BaseEventLoop.__init__(self)
+        self._widget = widget
+    
+    def run_forever(self):
+        self._widget.mainloop()
 
 class FileEvent(BaseFileEvent):
     from tkinter import (READABLE as READ, WRITABLE as WRITE)
