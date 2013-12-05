@@ -5,7 +5,7 @@ API modelled around the built-in "http.client" package
 # Reference: https://tools.ietf.org/html/rfc2616
 
 from http.client import (
-    HTTP_PORT, UnknownTransferEncoding, BadStatusLine, UnknownProtocol)
+    UnknownTransferEncoding, BadStatusLine, UnknownProtocol, HTTPException)
 import eventgen
 import email.parser
 
@@ -192,8 +192,11 @@ class IdentityResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        (self.size,) = self.msg.get_all("Content-Length", ())
-        self.size = int(self.size)
+        length = iter(self.msg.get_all("Content-Length", ()))
+        self.size = int(next(length))
+        for dupe in length:
+            if int(dupe) != self.size:
+                raise HTTPException("Conflicting Content-Length values")
         if self.size:
             self.data = parser.c
         else:
