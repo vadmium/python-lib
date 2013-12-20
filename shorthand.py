@@ -47,10 +47,16 @@ def bitmask(size):
     return ~(~0 << size)
 
 @contextmanager
-def substattr(obj, name, value):
-    orig = getattr(obj, name)
+def substattr(obj, attr, *value):
+    if value:
+        (value,) = value
+    else:
+        value = attr
+        attr = attr.__name__
+    
+    orig = getattr(obj, attr)
     try:
-        setattr(obj, name, value)
+        setattr(obj, attr, value)
         yield value
     finally:
-        setattr(obj, name, orig)
+        setattr(obj, attr, orig)
