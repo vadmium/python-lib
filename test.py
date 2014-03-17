@@ -2,6 +2,7 @@
 
 from unittest import TestCase
 from io import BytesIO
+from errno import EPIPE
 
 import iview.utils
 import urllib.request
@@ -65,6 +66,24 @@ class TestLoopbackHttp(TestPersistentHttp):
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(2, self.handle_calls,
             "Server handle() not called for /two")
+    
+    def test_close_pipe(self):
+        """Test connection closure reported as broken pipe"""
+        self.close_connection = True
+        with self.session.open(self.url + "/one") as response:
+            self.assertEqual(b"body\r\n", response.read())
+        self.assertEqual(1, self.handle_calls,
+            "Server handle() not called for /one")
+        
+        data = b"3" * 3000000
+        try:
+            self.session.open(self.url + "/two", data)
+        except EnvironmentError as err:
+            self.assertEqual(EPIPE, err.errno, "EPIPE expected")
+        else:
+            self.fail("POST should have failed")
+        self.assertEqual(1, self.handle_calls,
+            "Server handle() retried for POST")
 
 import http.client
 
