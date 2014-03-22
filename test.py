@@ -2,10 +2,12 @@
 
 from unittest import TestCase
 from io import BytesIO
+from iview.utils import fastforward
 from errno import EPIPE
 
 import iview.utils
 import urllib.request
+import http.client
 
 class TestPersistentHttp(TestCase):
     def setUp(self):
@@ -23,7 +25,18 @@ class TestLoopbackHttp(TestPersistentHttp):
             protocol_version = "HTTP/1.1"
             
             self.close_connection = False
+            
             def do_GET(handler):
+                handler.send_response(200)
+                handler.send_header("Content-Length", format(6))
+                handler.end_headers()
+                handler.wfile.write(b"body\r\n")
+                handler.close_connection = self.close_connection
+            
+            def do_POST(handler):
+                length = int(handler.headers["Content-Length"])
+                fastforward(handler.rfile, length)
+                
                 handler.send_response(200)
                 handler.send_header("Content-Length", format(6))
                 handler.end_headers()
@@ -57,15 +70,23 @@ class TestLoopbackHttp(TestPersistentHttp):
     def test_close_empty(self):
         """Test connection closure seen as empty response"""
         self.close_connection = True
+        
         with self.session.open(self.url + "/one") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls,
             "Server handle() not called for /one")
         
+        # Idempotent request should be retried
         with self.session.open(self.url + "/two") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(2, self.handle_calls,
             "Server handle() not called for /two")
+        
+        # Non-idempotent request should not be retried
+        with self.assertRaises(http.client.BadStatusLine):
+            self.session.open(self.url + "/post", b"data")
+        self.assertEqual(2, self.handle_calls,
+            "Server handle() retried for POST")
     
     def test_close_pipe(self):
         """Test connection closure reported as broken pipe"""
@@ -84,8 +105,6 @@ class TestLoopbackHttp(TestPersistentHttp):
             self.fail("POST should have failed")
         self.assertEqual(1, self.handle_calls,
             "Server handle() retried for POST")
-
-import http.client
 
 class TestMockHttp(TestPersistentHttp):
     class HTTPConnection(http.client.HTTPConnection):
