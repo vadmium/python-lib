@@ -164,7 +164,7 @@ def url_port(url, scheme, ports):
 
 def formataddr(address):
     (host, port) = address
-    if ":" in host:
+    if not frozenset("[]:").isdisjoint(host):
         host = "[{}]".format(host)
     return "{}:{}".format(host, port)
 
