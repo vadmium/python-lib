@@ -169,6 +169,12 @@ scheme="", netloc="", path="", params="", query="", fragment=""):
         scheme, netloc, path, params, query, fragment)
     return urlunparse(struct)
 
+def formataddr(address):
+    (host, port) = address
+    if not frozenset("[]:").isdisjoint(host):
+        host = "[{}]".format(host)
+    return "{}:{}".format(host, port)
+
 class Context(object):
     def __enter__(self):
         return self
