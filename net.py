@@ -103,6 +103,14 @@ def header_unquote(header):
     return "".join(segments)
 
 class Server(BaseServer):
+    default_port = 0
+    
+    def __init__(self, address=("", None), RequestHandlerClass=None):
+        [host, port] = address
+        if port is None:
+            port = self.default_port
+        super().__init__((host, port), RequestHandlerClass)
+    
     def serve_forever(self, *pos, **kw):
         try:
             return super().serve_forever(*pos, **kw)
