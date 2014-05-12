@@ -82,7 +82,8 @@ class ImportWrapper(WrapperFunction):
 
 wrap_import()
 
-from urllib.parse import (urlsplit, urlunsplit)
+from urllib.parse import urlsplit, urlunsplit, urlunparse
+import urllib.parse
 
 class exc_sink(Function):
     """Decorator wrapper to trap all exceptions raised from a function to the
@@ -159,6 +160,18 @@ def url_port(url, scheme, ports):
     path = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
     return dict(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
+
+def urlbuild(
+scheme="", netloc="", path="", params="", query="", fragment=""):
+    struct = urllib.parse.ParseResult(
+        scheme, netloc, path, params, query, fragment)
+    return urlunparse(struct)
+
+def formataddr(address):
+    (host, port) = address
+    if not frozenset("[]:").isdisjoint(host):
+        host = "[{}]".format(host)
+    return "{}:{}".format(host, port)
 
 class Context(object):
     def __enter__(self):
