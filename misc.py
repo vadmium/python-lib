@@ -4,6 +4,7 @@ import os
 from functions import setitem
 from functions import Function, WrapperFunction
 from functools import partial
+import os.path
 
 def wrap_import():
     global installed_wrapper
@@ -104,6 +105,21 @@ def gen_repr(gi):
     else:
         return "<{0} {1:#x} (inactive)>".format(gi.gi_code.co_name,
             id(gi))
+
+def joinpath(path, base=""):
+    """Validates and joins a sequence of path elements into an OS path
+    
+    Each path element is an individual directory, subdirectory or file
+    name. Raises ValueError if an element name is not supported by the
+    OS."""
+    
+    illegal_names = frozenset(
+        ("", os.path.curdir, os.path.pardir, os.path.devnull))
+    for elem in path:
+        if os.path.dirname(elem) or elem in illegal_names:
+            fmt = "Path element not supported by OS: {0!r}"
+            raise ValueError(fmt.format(elem))
+    return os.path.join(base, *path)
 
 def relpath(path, start=""):
     """Converts an OS path string to an OS independent path tuple
