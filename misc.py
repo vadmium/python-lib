@@ -161,11 +161,9 @@ def url_port(url, scheme, ports):
     return dict(scheme=parsed.scheme, hostname=parsed.hostname, port=port,
         path=path, username=parsed.username, password=parsed.password)
 
-def urlbuild(
-scheme="", netloc="", path="", params="", query="", fragment=""):
-    struct = urllib.parse.ParseResult(
+def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
+    return urllib.parse.ParseResult(
         scheme, netloc, path, params, query, fragment)
-    return urlunparse(struct)
 
 def formataddr(address):
     (host, port) = address
