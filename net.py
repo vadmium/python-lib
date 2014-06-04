@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit, urlunsplit
 import urllib.parse
+from socketserver import BaseServer
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -55,3 +56,10 @@ def header_list(message, header):
             if elem:
                 yield elem
             pos = comma + 1
+
+class Server(BaseServer):
+    def serve_forever(self, *pos, **kw):
+        try:
+            return super().serve_forever(*pos, **kw)
+        finally:
+            self.server_close()
