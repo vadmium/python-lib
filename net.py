@@ -34,28 +34,73 @@ def formataddr(address):
 
 def header_list(message, header):
     for header in message.get_all(header, ()):
-        sentinelled = header + ',"\\'
+        yield from header_split(header, ",")
+
+class HeaderParams(dict):
+    def __init__(self, params):
+        dict.__init__(self)
+        for param in header_split(params, ";"):
+            [param, value] = header_partition(param, "=")
+            param = param.strip().lower()
+            self.setdefault(param, list()).append(value.strip())
+    
+    def __missing__(*pos, **kw):
+        return ()
+    
+    def get_single(self, name):
+        value = self[name]
+        if not value:
+            raise KeyError("Missing {!r} parameter".format(name))
+        if len(value) > 1:
+            raise ValueError("Multiple {!r} parameters".format(name))
+        [value] = value
+        return value
+
+def header_split(header, delim):
+    while header:
+        [elem, header] = header_partition(header, delim)
+        if elem:
+            yield elem
+
+def header_partition(header, sep):
+    sentinelled = header + sep + '"\\'
+    pos = 0
+    while True:  # For each quoted segment
+        end = sentinelled.index(sep, pos)
+        quote = sentinelled.index('"', pos)
+        if end < quote:
+            break
+        pos = quote + 1
+        while True:  # For each backslash escape in quote
+            quote = sentinelled.index('"', pos)
+            backslash = sentinelled.index("\\", pos)
+            if quote < backslash:
+                break
+            pos = min(backslash + 2, len(header))
+        pos = min(quote + 1, len(header))
+    
+    return (header[:end].strip(), header[end + 1:].strip())
+
+def header_unquote(header):
+    segments = list()
+    while header:  # For each quoted segment
+        [unquoted, _, header] = header.partition('"')
+        segments.append(unquoted)
+        
+        sentinelled = header + '"\\'
+        start = 0
         pos = 0
-        while pos < len(header):  # For each comma-delimited list element
-            start = pos
-            while True:  # For each quoted section within list element
-                comma = sentinelled.index(",", pos)
-                quote = sentinelled.index('"', pos)
-                if comma < quote:
-                    break
-                pos = quote + 1
-                while True:  # For each backslash escape in quote
-                    quote = sentinelled.index('"', pos)
-                    backslash = sentinelled.index("\\", pos)
-                    if quote < backslash:
-                        break
-                    pos = min(backslash + 2, len(header))
-                pos = min(quote + 1, len(header))
-            
-            elem = header[start:comma].strip()
-            if elem:
-                yield elem
-            pos = comma + 1
+        while True:  # For each backslash escape in quote
+            quote = sentinelled.index('"', pos)
+            backslash = sentinelled.index("\\", pos)
+            if quote < backslash:
+                break
+            segments.append(header[start:backslash])
+            start = min(backslash + 1, len(header))
+            pos = min(start + 2, len(header))
+        segments.append(header[start:quote])
+        header = header[quote + 1:]
+    return "".join(segments)
 
 class Server(BaseServer):
     def serve_forever(self, *pos, **kw):
