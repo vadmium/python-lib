@@ -120,10 +120,11 @@ class Server(BaseServer):
         finally:
             self.server_close()
     
-    def handle_error(self, *pos, **kw):
+    def handle_error(self, request, client_address):
         [exc, *_] = sys.exc_info()
         if issubclass(exc, ConnectionError):
             return
         if not issubclass(exc, Exception):
+            self.close_request(request)
             raise  # Force server loop to exit
-        super().handle_error(*pos, **kw)
+        super().handle_error(request, client_address)
