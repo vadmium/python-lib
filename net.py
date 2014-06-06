@@ -27,10 +27,12 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
         scheme, netloc, path, params, query, fragment)
 
 def formataddr(address):
-    (host, port) = address
-    if not frozenset("[]:").isdisjoint(host):
-        host = "[{}]".format(host)
-    return "{}:{}".format(host, port)
+    (address, port) = address
+    if not frozenset("[]:").isdisjoint(address):
+        addrss = "[{}]".format(address)
+    if port is not None:
+        address = "{}:{}".format(address, port)
+    return address
 
 def header_list(message, header):
     for header in message.get_all(header, ()):
