@@ -2,6 +2,7 @@ from urllib.parse import urlsplit, urlunsplit
 import urllib.parse
 from socketserver import BaseServer
 import sys
+from ssl import SSLError
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -121,10 +122,13 @@ class Server(BaseServer):
             self.server_close()
     
     def handle_error(self, request, client_address):
-        [exc, *_] = sys.exc_info()
-        if issubclass(exc, ConnectionError):
+        [_, exc, *_] = sys.exc_info()
+        if isinstance(exc, ConnectionError):
             return
-        if not issubclass(exc, Exception):
+        if (isinstance(exc, SSLError) and
+        exc.reason == "TLSV1_ALERT_UNKNOWN_CA"):
+            return
+        if not isinstance(exc, Exception):
             self.close_request(request)
             raise  # Force server loop to exit
         super().handle_error(request, client_address)
