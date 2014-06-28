@@ -28,6 +28,14 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
     return urllib.parse.ParseResult(
         scheme, netloc, path, params, query, fragment)
 
+def url_replace(url,
+scheme="", netloc="", path="", params="", query="", fragment=""):
+    res = list()
+    mods = (scheme, netloc, path, params, query, fragment)
+    for [orig, mod] in zip(url, mods):
+        res.append(orig or mod)
+    return urllib.parse.urlunparse(res)
+
 def formataddr(address):
     (address, port) = address
     if not frozenset("[]:").isdisjoint(address):
