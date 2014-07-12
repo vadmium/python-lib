@@ -26,7 +26,7 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
     return urllib.parse.ParseResult(
         scheme, netloc, path, params, query, fragment)
 
-def formataddr(address):
+def format_addr(address):
     (host, port) = address
     if not frozenset("[]:").isdisjoint(host):
         host = "[{}]".format(host)
