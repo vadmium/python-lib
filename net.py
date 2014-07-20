@@ -32,6 +32,16 @@ def format_addr(address):
         host = "[{}]".format(host)
     return "{}:{}".format(host, port)
 
+def parse_addr(address, defport=None):
+    address = Url(netloc=address)
+    host = address.hostname
+    if host is None:
+        host = ""
+    port = address.port
+    if port is None:
+        port = defport
+    return (host, port)
+
 def header_list(message, header):
     for header in message.get_all(header, ()):
         yield from header_split(header, ",")
