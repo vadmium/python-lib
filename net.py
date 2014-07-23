@@ -3,6 +3,7 @@ import urllib.parse
 from socketserver import BaseServer
 import sys
 from ssl import SSLError
+from misc import Context
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -114,7 +115,7 @@ def header_unquote(header):
         header = header[quote + 1:]
     return "".join(segments)
 
-class Server(BaseServer):
+class Server(BaseServer, Context):
     default_port = 0
     
     def __init__(self, address=("", None), RequestHandlerClass=None):
@@ -123,11 +124,8 @@ class Server(BaseServer):
             port = self.default_port
         super().__init__((host, port), RequestHandlerClass)
     
-    def serve_forever(self, *pos, **kw):
-        try:
-            return super().serve_forever(*pos, **kw)
-        finally:
-            self.server_close()
+    def close(self):
+        return self.server_close()
     
     def handle_error(self, request, client_address):
         [_, exc, *_] = sys.exc_info()
