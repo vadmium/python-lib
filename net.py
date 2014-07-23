@@ -1,6 +1,9 @@
 from urllib.parse import urlsplit, urlunsplit
 import urllib.parse
 from socketserver import BaseServer
+import sys
+from ssl import SSLError
+from misc import Context
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -26,11 +29,21 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
     return urllib.parse.ParseResult(
         scheme, netloc, path, params, query, fragment)
 
+def url_replace(url,
+scheme="", netloc="", path="", params="", query="", fragment=""):
+    res = list()
+    mods = (scheme, netloc, path, params, query, fragment)
+    for [orig, mod] in zip(url, mods):
+        res.append(orig or mod)
+    return urllib.parse.urlunparse(res)
+
 def format_addr(address):
-    (host, port) = address
-    if not frozenset("[]:").isdisjoint(host):
-        host = "[{}]".format(host)
-    return "{}:{}".format(host, port)
+    (address, port) = address
+    if not frozenset("[]:").isdisjoint(address):
+        addrss = "[{}]".format(address)
+    if port is not None:
+        address = "{}:{}".format(address, port)
+    return address
 
 def parse_addr(address, defport=None):
     address = Url(netloc=address)
@@ -112,9 +125,26 @@ def header_unquote(header):
         header = header[quote + 1:]
     return "".join(segments)
 
-class Server(BaseServer):
-    def serve_forever(self, *pos, **kw):
-        try:
-            return super().serve_forever(*pos, **kw)
-        finally:
-            self.server_close()
+class Server(BaseServer, Context):
+    default_port = 0
+    
+    def __init__(self, address=("", None), RequestHandlerClass=None):
+        [host, port] = address
+        if port is None:
+            port = self.default_port
+        super().__init__((host, port), RequestHandlerClass)
+    
+    def close(self):
+        return self.server_close()
+    
+    def handle_error(self, request, client_address):
+        [_, exc, *_] = sys.exc_info()
+        if isinstance(exc, ConnectionError):
+            return
+        if (isinstance(exc, SSLError) and
+        exc.reason == "TLSV1_ALERT_UNKNOWN_CA"):
+            return
+        if not isinstance(exc, Exception):
+            self.close_request(request)
+            raise  # Force server loop to exit
+        super().handle_error(request, client_address)
