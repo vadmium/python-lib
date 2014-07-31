@@ -310,7 +310,7 @@ class Ttk(object):
         return file
     
     def EventDriver(self):
-        from eventgen.tk import Driver
+        from coroutines.tk import Driver
         return Driver(self.root)
 
 def convert_label(ctrl):
