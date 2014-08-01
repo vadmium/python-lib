@@ -6,6 +6,9 @@ from . import Send
 from functions import weakmethod
 from warnings import warn
 from asyncio.base_events import BaseEventLoop
+from traceback import format_exception
+import tkinter
+from tkwrap import scroll
 
 class EventLoop(BaseEventLoop):
     def call_soon(self, callback, *pos, **kw):
@@ -17,9 +20,30 @@ class EventLoop(BaseEventLoop):
     
     def run_forever(self):
         self._widget.mainloop()
+    
+    def default_exception_handler(self, context):
+        BaseEventLoop.default_exception_handler(self, context)
+        
+        lines = list()
+        lines.append(context.pop("message"))
+        exc = context.pop("exception")
+        for item in sorted(context.items()):
+            lines.append("{}={!r}".format(*item))
+        exc = "".join(format_exception(type(exc), exc, exc.__traceback__))
+        lines.append(exc.rstrip())
+        
+        window = tkinter.Toplevel(self._widget)
+        window.title("Exception")
+        text = tkinter.Text(window, wrap="word")
+        scroll(text)
+        text.focus_set()
+        text.insert(tkinter.END, "\n".join(lines))
+        text.see(tkinter.END)
+        text["state"] = tkinter.DISABLED
 
 class FileEvent(BaseFileEvent):
-    from tkinter import (READABLE as READ, WRITABLE as WRITE)
+    READ = tkinter.READABLE
+    WRITE = tkinter.WRITABLE
     
     def __init__(self, *args, **kw):
         self.tk = self.widget.tk
