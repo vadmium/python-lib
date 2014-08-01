@@ -1,5 +1,5 @@
 import tkinter
-from tkinter.ttk import (Frame, Label, Scrollbar, Sizegrip)
+from tkinter.ttk import Label, Scrollbar, Sizegrip
 from tkinter.ttk import Treeview
 from tkinter.font import nametofont
 from math import ceil
@@ -29,19 +29,40 @@ class Form(object):
             self.master.rowconfigure(row, weight=1)
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
-class ScrolledTree(Frame):
-    def __init__(self, master, columns=1,
-    tree=True, headings=True, resize=False):
+def scroll(view, vert=True, horiz=True, resize=False):
+    kw = dict()
+    if resize:
+        if not horiz:
+            kw.update(rowspan=2)
+        if not vert:
+            kw.update(colspan=2)
+    view.grid(sticky=(tkinter.EW, tkinter.NS), **kw)
+    
+    view.master.rowconfigure(0, weight=1)
+    view.master.columnconfigure(0, weight=1)
+    
+    if vert:
+        scroll = Scrollbar(view.master, orient=tkinter.VERTICAL,
+            command=view.yview)
+        scroll.grid(row=0, column=1, sticky=(tkinter.W, tkinter.NS))
+        view.configure(yscrollcommand=scroll.set)
+    if horiz:
+        scroll = Scrollbar(view.master, orient=tkinter.HORIZONTAL,
+            command=view.xview)
+        scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
+        view.configure(xscrollcommand=scroll.set)
+    if resize:
+        resize = Sizegrip(view.master)
+        resize.grid(row=1, column=1, sticky=(tkinter.EW, tkinter.NS))
+
+class Tree(Treeview):
+    def __init__(self, master, columns=1, tree=True, headings=True):
         """
         columns: int, or len(columns): Number of columns; default: 1
         iter(columns): Iterator of dict() objects; optional. Elements may
             also be strings, equivalent to the "heading" value. Keys:
                 "heading": Optional
                 "width": Optional"""
-        
-        Frame.__init__(self, master)
-        self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=1)
         
         try:
             self.nontree_columns = len(columns)
@@ -62,22 +83,8 @@ class ScrolledTree(Frame):
             show.append("headings")
         
         self.nontree_columns = range(self.nontree_columns)
-        self.tree = Treeview(self, show=show,
+        Treeview.__init__(self, master, show=show,
             columns=tuple(self.nontree_columns))
-        self.tree.grid(sticky=(tkinter.EW, tkinter.NS))
-        
-        scroll = Scrollbar(self, orient=tkinter.VERTICAL,
-            command=self.tree.yview)
-        scroll.grid(row=0, column=1, sticky=(tkinter.W, tkinter.NS))
-        self.tree.configure(yscrollcommand=scroll.set)
-        scroll = Scrollbar(self, orient=tkinter.HORIZONTAL,
-            command=self.tree.xview)
-        scroll.grid(row=1, column=0, sticky=(tkinter.N, tkinter.EW))
-        self.tree.configure(xscrollcommand=scroll.set)
-        
-        if resize:
-            resize = Sizegrip(self)
-            resize.grid(row=1, column=1, sticky=(tkinter.EW, tkinter.NS))
         
         self.heading_font = nametofont("TkHeadingFont")
         self.heading_space = "\N{EN QUAD}"
@@ -95,7 +102,7 @@ class ScrolledTree(Frame):
                 except LookupError:
                     pass
                 else:
-                    self.tree.heading(key, text=heading)
+                    self.heading(key, text=heading)
             
             try:
                 width = value["width"]
@@ -103,7 +110,7 @@ class ScrolledTree(Frame):
                 auto = True
                 
                 if headings:
-                    text = self.tree.heading(key, option="text")
+                    text = self.heading(key, option="text")
                     text += self.heading_space
                     width = self.heading_font.measure(text)
             
@@ -118,29 +125,29 @@ class ScrolledTree(Frame):
                 width += self.space_size
             
             self.auto_width.append(auto)
-            width = max(width, self.tree.column(key, option="minwidth"))
+            width = max(width, self.column(key, option="minwidth"))
             stretch = value.get("stretch", False)
-            self.tree.column(key, stretch=stretch, width=width)
+            self.column(key, stretch=stretch, width=width)
         
-        self.tree.bind("<End>", self.end)
+        self.bind("<End>", self.end)
     
     FIGURE = "\N{FIGURE SPACE}"
     
     def end(self, event):
         item = ""
         while True:
-            children = self.tree.get_children(item)
+            children = self.get_children(item)
             if not children:
                 break
             item = children[-1]
             
             # Sometimes the "open" option is the integer 0; other times it is
             # a Tcl_Obj() with a string value of "true" or "false"!
-            if not getboolean(str(self.tree.item(item, option="open"))):
+            if not getboolean(str(self.item(item, option="open"))):
                 break
-        self.tree.focus(item)
-        self.tree.selection_set((item,))
-        self.tree.see(item)
+        self.focus(item)
+        self.selection_set((item,))
+        self.see(item)
     
     def columns(self):
         if self.tree_shown:
@@ -151,18 +158,18 @@ class ScrolledTree(Frame):
     def add(self, parent="", *args, **kw):
         if not isinstance(kw.get("values", ()), Sequence):
             kw["values"] = tuple(kw["values"])
-        child = self.tree.insert(parent, "end", *args, **kw)
-        if not self.tree.focus():
-            self.tree.focus(child)
+        child = self.insert(parent, "end", *args, **kw)
+        if not self.focus():
+            self.focus(child)
         
         auto = iter(self.auto_width)
         if self.tree_shown and next(auto):
             width = 1
             while parent:
                 width += 1
-                parent = self.tree.parent(parent)
+                parent = self.parent(parent)
             em = font_size(self.text_font["size"])
-            width *= self.tree.winfo_fpixels(em)
+            width *= self.winfo_fpixels(em)
             
             try:
                 text = kw["text"]
@@ -171,22 +178,22 @@ class ScrolledTree(Frame):
             else:
                 width += self.text_font.measure(text) + self.space_size
             
-            if width > self.tree.column("#0", option="width"):
-                self.tree.column("#0", width=ceil(width))
+            if width > self.column("#0", option="width"):
+                self.column("#0", width=ceil(width))
         
         for (i, value) in enumerate(kw.get("values", ())):
             if not next(auto):
                 continue
             width = self.text_font.measure(value) + self.space_size
-            if width > self.tree.column(i, option="width"):
-                self.tree.column(i, width=width)
+            if width > self.column(i, option="width"):
+                self.column(i, width=width)
         
         return child
     
     def bind_select(self, *args, **kw):
-        return self.tree.bind("<<TreeviewSelect>>", *args, **kw)
+        return self.bind("<<TreeviewSelect>>", *args, **kw)
     def unbind_select(self, *args, **kw):
-        return self.tree.unbind("<<TreeviewSelect>>", *args, **kw)
+        return self.unbind("<<TreeviewSelect>>", *args, **kw)
 
 def font_size(size):
     if size < 0:
