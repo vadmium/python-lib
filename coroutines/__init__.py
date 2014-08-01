@@ -20,11 +20,6 @@ from traceback import extract_stack
 from warnings import warn
 from .results import ReturnResult, RaiseResult, call_result
 
-try:  # Python 3.2
-    ResourceWarning
-except NameError:  # Python < 3.2
-    ResourceWarning = Warning
-
 class routine(WrapperFunction):
     """Decorator converting generator factory into Thread() factory"""
     def __call__(self, *args, **kw):
