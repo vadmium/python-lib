@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from traceback import extract_stack
 from warnings import warn
 from .results import ReturnResult, RaiseResult, call_result
+from asyncio import Task
 
 class routine(WrapperFunction):
     """Decorator converting generator factory into Thread() factory"""
@@ -119,6 +120,22 @@ class Thread(object):
 
 # Imitation Result object to start a generator by invoking send(None)
 _startresult = ReturnResult(None)
+
+class MainTask(Task):
+    """Task that is not expected to return a value or exception"""
+    
+    def __init__(self, *pos, loop, **kw):
+        Task.__init__(self, *pos, loop=loop, **kw)
+        self.loop = loop
+        self.add_done_callback(type(self)._on_done)
+    
+    def _on_done(self):
+        exc = self.exception()
+        if exc:
+            self.loop.call_exception_handler(dict(
+                message="Exception in {!r}".format(self),
+                exception=exc,
+            ))
 
 class Event(object):
     """Base class that a thread can yield to wait for an event
