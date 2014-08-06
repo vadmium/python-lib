@@ -6,30 +6,14 @@ API modelled around the built-in "http.client" package
 
 from http.client import (
     UnknownTransferEncoding, BadStatusLine, UnknownProtocol, HTTPException)
-from coroutines import task
 import coroutines
 import email.parser
 
 class HTTPConnection:
     def __init__(self, sock):
         self.sock = sock
-        self.requests = coroutines.Queue()
-        self.request_handler = self.RequestHandler()
-    
-    def close(self):
-        self.request_handler.close()
-        self.sock.close()
-    
-    @task
-    def RequestHandler(self):
-        while True:
-            yield from (yield from self.requests.get())
     
     def request(self, method, hostname, path):
-        # TODO: limit the number of queued requests, or size of request queue
-        self.requests.put_nowait(self.Request(method, hostname, path))
-    
-    def Request(self, method, hostname, path):
         yield from self.sock.sendall(method.encode())
         yield from self.sock.sendall(b" ")
         for c in path.encode("utf-8"):
