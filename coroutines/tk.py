@@ -9,17 +9,35 @@ from asyncio.base_events import BaseEventLoop
 from traceback import format_exception
 import tkinter
 from tkwrap import scroll
+from functools import partial
 
 class EventLoop(BaseEventLoop):
+    def base_init(self):
+        BaseEventLoop.__init__(self)
+        self.callbacks = None
+    
     def call_soon(self, callback, *pos, **kw):
-        return callback(*pos, **kw)
+        if not self.callbacks:
+            self.callbacks = list()
+            self.new_callbacks()
+        self.callbacks.append(partial(callback, *pos, **kw))
+    call_soon_threadsafe = call_soon
+    
+    def invoke_callbacks(self):
+        callbacks = self.callbacks
+        self.callbacks = None
+        for callback in callbacks:
+            callback()
     
     def __init__(self, widget):
-        BaseEventLoop.__init__(self)
+        self.base_init()
         self._widget = widget
     
     def run_forever(self):
         self._widget.mainloop()
+    
+    def new_callbacks(self):
+        self._widget.after_idle(self.invoke_callbacks)
     
     def default_exception_handler(self, context):
         BaseEventLoop.default_exception_handler(self, context)
