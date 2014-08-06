@@ -30,23 +30,23 @@ class HTTPConnection:
         self.requests.put_nowait(self.Request(method, hostname, path))
     
     def Request(self, method, hostname, path):
-        yield from self.sock.send(method.encode())
-        yield from self.sock.send(b" ")
+        yield from self.sock.sendall(method.encode())
+        yield from self.sock.sendall(b" ")
         for c in path.encode("utf-8"):
             if c <= ord(b" "):
-                yield from self.sock.send(b"%{:02X}".format(c))
+                yield from self.sock.sendall(b"%{:02X}".format(c))
             else:
-                yield from self.sock.send(bytes((c,)))
+                yield from self.sock.sendall(bytes((c,)))
         
-        yield from self.sock.send(b" HTTP/1.1\r\n"
+        yield from self.sock.sendall(b" HTTP/1.1\r\n"
             
             # Mandatory for 1.1:
             b"Host: "
         )
-        yield from self.sock.send(hostname.encode())
+        yield from self.sock.sendall(hostname.encode())
         # User-Agent: python-event-http
         # X-Forwarded-For: . . .
-        yield from self.sock.send(b"\r\n"
+        yield from self.sock.sendall(b"\r\n"
             b"\r\n"
         )
     

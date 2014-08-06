@@ -1,14 +1,15 @@
 import socket
 import ssl
 from ssl import SSLWantReadError, SSLWantWriteError
+from asyncio import Future
 
 class Socket:
     """Provides coroutines for common blocking socket operations"""
     
-    def __init__(self, event_driver, *args, **kw):
+    def __init__(self, *args, loop, **kw):
+        self.loop = loop
         self.sock = socket.socket(*args, **kw)
         self.sock.setblocking(False)
-        self.event = event_driver.FileEvent(self.sock.fileno())
     
     def connect(self, *args, **kw):
         while True:
@@ -17,7 +18,10 @@ class Socket:
                 break
             except BlockingIOError:
                 # Avoid yielding in exception handler
-            yield self.event.writable()
+                pass
+            future = Future(loop=self.loop)
+            self.loop.add_writer(self.sock.fileno(), future.set_result, None)
+            yield from future
     
     def recv(self, *args, **kw):
         while True:
@@ -25,9 +29,12 @@ class Socket:
                 return self.sock.recv(*args, **kw)
             except (BlockingIOError, SSLWantReadError):
                 # Avoid yielding in exception handler
-            yield self.event.readable()
+                pass
+            future = Future(loop=self.loop)
+            self.loop.add_reader(self.sock.fileno(), future.set_result, None)
+            yield from future
     
-    def send(self, data, *args, **kw):
+    def sendall(self, data, *args, **kw):
         while data:
             data = data[self.sock.send(data, *args, **kw):]
         if False:
@@ -47,7 +54,9 @@ class Ssl(Socket):
                 self.sock.do_handshake(*args, **kw)
                 break
             except SSLWantReadError:
-                event = self.event.readable
+                add_watcher = self.loop.add_reader
             except SSLWantWriteError:
-                event = self.event.writable
-            yield event()
+                add_watcher = self.loop.add_writer
+            future = Future(loop=self.loop)
+            add_watcher(self.sock.fileno(), future.set_result, None)
+            yield from future
