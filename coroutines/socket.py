@@ -1,9 +1,10 @@
 import socket
 import ssl
 from ssl import SSLWantReadError, SSLWantWriteError
+from misc import Context
 from asyncio import Future
 
-class Socket:
+class Socket(Context):
     """Provides coroutines for common blocking socket operations"""
     
     def __init__(self, *args, loop, **kw):
