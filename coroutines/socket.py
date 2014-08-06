@@ -4,7 +4,7 @@ from errno import (EINPROGRESS, EAGAIN)
 from ssl import (SSLError, SSL_ERROR_WANT_READ, SSL_ERROR_WANT_WRITE)
 
 class Socket:
-    """Provides event generators for common blocking socket operations"""
+    """Provides coroutines for common blocking socket operations"""
     
     def __init__(self, event_driver, *args, **kw):
         self.sock = socket.socket(*args, **kw)
