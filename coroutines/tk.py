@@ -13,18 +13,18 @@ from functools import partial
 class EventLoop(BaseEventLoop):
     def base_init(self):
         BaseEventLoop.__init__(self)
-        self.callbacks = None
+        self.callbacks = dict()  # {None: [callbacks]}
     
     def call_soon(self, callback, *pos, **kw):
-        if not self.callbacks:
-            self.callbacks = list()
+        new = list()
+        queue = self.callbacks.setdefault(None, new)
+        queue.append(partial(callback, *pos, **kw))
+        if queue is new:
             self.new_callbacks()
-        self.callbacks.append(partial(callback, *pos, **kw))
     call_soon_threadsafe = call_soon
     
     def invoke_callbacks(self):
-        callbacks = self.callbacks
-        self.callbacks = None
+        callbacks = self.callbacks.pop(None)
         for callback in callbacks:
             callback()
     
