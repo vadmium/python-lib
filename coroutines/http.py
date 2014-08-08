@@ -106,39 +106,28 @@ class HTTPConnection:
                     raise BadStatusLine(pre_space + pattern + major + b"." +
                         minor + mid_space + status)
         
-        #~ except BadStatusLine as e:
-        if False:
-            (pending,) = e.args
-            status = None
-            reason = None
-            from email import message_from_string
-            msg = message_from_string("")
+        if int(major) != 1:
+            raise UnknownProtocol("HTTP/{}".format(major))
         
+        yield from parser.next_char()
+        yield from parser.space()
+        
+        reason = bytearray()
+        for i in range(400):
+            if i:
+                yield from parser.next_char()
+                yield from parser.after_eol()
+            if parser.eol is not None:
+                if not parser.at_lws():
+                    break
+                else:
+                    reason.extend(parser.eol)
+            reason.extend(parser.c)
         else:
-            if int(major) != 1:
-                raise UnknownProtocol("HTTP/{}".format(major))
-            
-            yield from parser.next_char()
-            yield from parser.space()
-            
-            reason = bytearray()
-            for i in range(400):
-                if i:
-                    yield from parser.next_char()
-                    yield from parser.after_eol()
-                if parser.eol is not None:
-                    if not parser.at_lws():
-                        break
-                    else:
-                        reason.extend(parser.eol)
-                reason.extend(parser.c)
-            else:
-                raise ExcessError("Status reason of 400 or more characters")
-            reason = reason.rstrip()
-            
-            msg = yield from parser.headers()
-            
-            # pending = parser.c
+            raise ExcessError("Status reason of 400 or more characters")
+        reason = reason.rstrip()
+        
+        msg = yield from parser.headers()
         
         te = msg.get_all("Transfer-Encoding", [])
         if not te:
