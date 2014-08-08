@@ -5,7 +5,8 @@ API modelled around the built-in "http.client" package
 # Reference: https://tools.ietf.org/html/rfc2616
 
 from http.client import (
-    UnknownTransferEncoding, BadStatusLine, UnknownProtocol, HTTPException)
+    UnknownTransferEncoding, UnknownProtocol, HTTPException)
+import http.client
 import coroutines
 import email.parser
 
@@ -344,5 +345,9 @@ class ExcessError(EnvironmentError):
     def __init__(self, msg, data=None):
         EnvironmentError.__init__(self, msg)
         self.data = data
+
+class BadStatusLine(http.client.BadStatusLine):
+    def __init__(self, line):
+        Exception.__init__(self, repr(line))
 
 CRLF = b"\r\n"
