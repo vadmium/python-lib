@@ -4,8 +4,8 @@ import sys
 from io import StringIO
 from unittest import (TestCase, TestSuite)
 from functions import decorator
-from funcparams import command
-import funcparams
+from clifunc import run
+import clifunc
 
 @decorator
 def suite_add(suite, Test):
@@ -26,7 +26,7 @@ def help(self):
     """Test help works and everything that is meant to be there is there"""
     
     capture = StringIO()
-    funcparams.help(Fixture().f, capture)
+    clifunc.help(Fixture().f, capture)
     
     self.maxDiff = None
     self.assertEqual("""\
@@ -43,7 +43,7 @@ Docstring body
 def positional(self):
     """Test function is called correctly"""
     fixture = Fixture()
-    command(fixture.f, "em -mand-opt emo".split())
+    run(fixture.f, "em -mand-opt emo".split())
     self.assertEqual(dict(fixture.defaults, mand="em", mand_opt="emo"),
         fixture.values)
 
@@ -51,7 +51,7 @@ def positional(self):
 @testfunc()
 def options(self):
     fixture = Fixture()
-    command(fixture.f,
+    run(fixture.f,
         "-mand=em -defnone=dee -noarg -multi m1 "
         "-mand-opt=emo -multi=m2 -optzero ozed -multi-opt mo1 -noarg-opt".
     split())
@@ -67,7 +67,7 @@ def types(self):
     fixture = Fixture()
     fixture.f.param_types = dict(
         var=float, mand_opt=set, optzero=int, multi_opt=float)
-    command(fixture.f,
+    run(fixture.f,
         "-mand-opt=hallo -optzero -12 -multi-opt=inf -multi-opt=01.0e+01 "
         "mand x x x -- 0 -1 +.625e-1".
     split())
@@ -85,7 +85,7 @@ def type_names(self):
     fixture = Fixture()
     fixture.f.param_types = dict({"*": int}, optzero=int, invalid=int)
     with self.assertRaises(TypeError):
-        command(fixture.f, "x -mand-opt=x".split())
+        run(fixture.f, "x -mand-opt=x".split())
 
 @suite_add(suite)
 @testfunc()
@@ -94,7 +94,7 @@ def nodoc(self):
     
     def f():
         pass
-    funcparams.help(f, StringIO())
+    clifunc.help(f, StringIO())
 
 @suite_add(suite)
 @testfunc()
@@ -107,7 +107,7 @@ def frozen(self):
     
     args = "7 42".split()
     param_types = dict(b=int)
-    command(f, args, param_types=param_types)
+    run(f, args, param_types=param_types)
     self.assertEqual("7 42".split(), args)
     self.assertEqual(dict(b=int), param_types)
 
