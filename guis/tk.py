@@ -158,7 +158,7 @@ class Ttk(object):
             return iter(ctrl.widget.tree.get_children())
     
     @setitem(controls, List)
-    class List(TreeBase):
+    class _List(TreeBase):
         def init(gui, *pos, **kw):
             return gui.TreeBase.init(gui, *pos, tree=False, **kw)
         
