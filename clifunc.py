@@ -88,7 +88,7 @@ except ImportError:  # Python < 3.3
         def __len__(self):
             return len(frozenset().union(*self.maps))
 
-def command(func=None, args=None, param_types=dict()):
+def run(func=None, args=None, param_types=dict()):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
@@ -387,7 +387,7 @@ If the function name is omitted, the main() function is called.""")
         if func is None:
             raise SystemExit("Module {} has no main() function".format(name))
     
-    return command(func, sys.argv[2:])
+    return run(func, sys.argv[2:])
 
 if __name__ == "__main__":
     raise SystemExit(main())

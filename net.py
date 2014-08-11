@@ -2,6 +2,8 @@ from urllib.parse import urlsplit, urlunsplit
 import urllib.parse
 from socketserver import BaseServer
 import sys
+from ssl import SSLError
+from misc import Context
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -27,13 +29,33 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
     return urllib.parse.ParseResult(
         scheme, netloc, path, params, query, fragment)
 
-def formataddr(address):
+def url_replace(url,
+scheme=None, netloc=None, path=None, params=None, query=None, fragment=None):
+    res = list()
+    mods = (scheme, netloc, path, params, query, fragment)
+    for [orig, part] in zip(url, mods):
+        if part is None:
+            part = orig
+        res.append(part)
+    return urllib.parse.urlunparse(res)
+
+def format_addr(address):
     (address, port) = address
     if not frozenset("[]:").isdisjoint(address):
         addrss = "[{}]".format(address)
     if port is not None:
         address = "{}:{}".format(address, port)
     return address
+
+def parse_addr(address, defport=None):
+    address = Url(netloc=address)
+    host = address.hostname
+    if host is None:
+        host = ""
+    port = address.port
+    if port is None:
+        port = defport
+    return (host, port)
 
 def header_list(message, header):
     for header in message.get_all(header, ()):
@@ -105,7 +127,7 @@ def header_unquote(header):
         header = header[quote + 1:]
     return "".join(segments)
 
-class Server(BaseServer):
+class Server(BaseServer, Context):
     default_port = 0
     
     def __init__(self, address=("", None), RequestHandlerClass=None):
@@ -114,16 +136,17 @@ class Server(BaseServer):
             port = self.default_port
         super().__init__((host, port), RequestHandlerClass)
     
-    def serve_forever(self, *pos, **kw):
-        try:
-            return super().serve_forever(*pos, **kw)
-        finally:
-            self.server_close()
+    def close(self):
+        return self.server_close()
     
-    def handle_error(self, *pos, **kw):
-        [exc, *_] = sys.exc_info()
-        if issubclass(exc, ConnectionError):
+    def handle_error(self, request, client_address):
+        [_, exc, *_] = sys.exc_info()
+        if isinstance(exc, ConnectionError):
             return
-        if not issubclass(exc, Exception):
+        if (isinstance(exc, SSLError) and
+        exc.reason == "TLSV1_ALERT_UNKNOWN_CA"):
+            return
+        if not isinstance(exc, Exception):
+            self.close_request(request)
             raise  # Force server loop to exit
-        super().handle_error(*pos, **kw)
+        super().handle_error(request, client_address)
