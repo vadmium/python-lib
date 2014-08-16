@@ -2,6 +2,7 @@ from functools import reduce
 import operator
 from math import ceil
 from . import Event
+from asyncio import async
 from functions import weakmethod
 from warnings import warn
 from asyncio.base_events import BaseEventLoop
@@ -28,6 +29,15 @@ class EventLoop(BaseEventLoop):
         for callback in callbacks:
             callback()
     
+    def run_until_complete(self, future):
+        future = async(future, loop=self)
+        future.add_done_callback(self._stop_callback)
+        self.run_forever()
+        return future.result()
+    
+    def _stop_callback(self, future):
+        return self.stop()
+    
     def __init__(self, widget):
         self.base_init()
         self._widget = widget
@@ -38,6 +48,9 @@ class EventLoop(BaseEventLoop):
     
     def new_callbacks(self):
         self._widget.after_idle(self.invoke_callbacks)
+    
+    def stop(self):
+        self._widget.quit()
     
     def default_exception_handler(self, context):
         BaseEventLoop.default_exception_handler(self, context)
