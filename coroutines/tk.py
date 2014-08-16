@@ -17,6 +17,8 @@ class EventLoop(BaseEventLoop):
         self.callbacks = dict()  # {None: [callbacks]}
     
     def call_soon(self, callback, *pos, **kw):
+        # Cannot call back immediately because some call sites assume the
+        # callback is not yet invoked when this function returns
         new = list()
         queue = self.callbacks.setdefault(None, new)
         queue.append(partial(callback, *pos, **kw))
