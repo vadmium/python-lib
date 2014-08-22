@@ -19,7 +19,38 @@ from contextlib import contextmanager
 from traceback import extract_stack
 from warnings import warn
 from .results import ReturnResult, RaiseResult, call_result
-from asyncio import Task
+import asyncio
+from asyncio.base_events import BaseEventLoop
+from functools import partial
+
+class EventLoop(BaseEventLoop):
+    def __init__(self, *pos, **kw):
+        super().__init__(*pos, **kw)
+        self.callbacks = dict()  # {None: [callbacks]}
+    
+    def call_soon(self, callback, *pos, **kw):
+        # Cannot call back immediately because some call sites assume the
+        # callback is not yet invoked when this function returns
+        new = list()
+        queue = self.callbacks.setdefault(None, new)
+        queue.append(partial(callback, *pos, **kw))
+        if queue is new:
+            self.new_callbacks()
+    call_soon_threadsafe = call_soon
+    
+    def invoke_callbacks(self):
+        callbacks = self.callbacks.pop(None)
+        for callback in callbacks:
+            callback()
+    
+    def run_until_complete(self, future):
+        future = asyncio.async(future, loop=self)
+        future.add_done_callback(self._stop_callback)
+        self.run_forever()
+        return future.result()
+    
+    def _stop_callback(self, future):
+        return self.stop()
 
 class routine(WrapperFunction):
     """Decorator converting generator factory into Thread() factory"""
@@ -118,11 +149,11 @@ class Thread(object):
 # Imitation Result object to start a generator by invoking send(None)
 _startresult = ReturnResult(None)
 
-class MainTask(Task):
+class MainTask(asyncio.Task):
     """Task that is not expected to return a value or exception"""
     
     def __init__(self, *pos, loop, **kw):
-        Task.__init__(self, *pos, loop=loop, **kw)
+        asyncio.Task.__init__(self, *pos, loop=loop, **kw)
         self.loop = loop
         self.add_done_callback(type(self)._on_done)
     

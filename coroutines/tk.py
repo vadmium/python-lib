@@ -2,46 +2,17 @@ from functools import reduce
 import operator
 from math import ceil
 from . import Event
-from asyncio import async
 from functions import weakmethod
 from warnings import warn
-from asyncio.base_events import BaseEventLoop
+from . import EventLoop as _EventLoop
 from traceback import format_exception
 import tkinter
 from tkwrap import scroll
 from functools import partial
 
-class EventLoop(BaseEventLoop):
-    def base_init(self):
-        BaseEventLoop.__init__(self)
-        self.callbacks = dict()  # {None: [callbacks]}
-    
-    def call_soon(self, callback, *pos, **kw):
-        # Cannot call back immediately because some call sites assume the
-        # callback is not yet invoked when this function returns
-        new = list()
-        queue = self.callbacks.setdefault(None, new)
-        queue.append(partial(callback, *pos, **kw))
-        if queue is new:
-            self.new_callbacks()
-    call_soon_threadsafe = call_soon
-    
-    def invoke_callbacks(self):
-        callbacks = self.callbacks.pop(None)
-        for callback in callbacks:
-            callback()
-    
-    def run_until_complete(self, future):
-        future = async(future, loop=self)
-        future.add_done_callback(self._stop_callback)
-        self.run_forever()
-        return future.result()
-    
-    def _stop_callback(self, future):
-        return self.stop()
-    
+class EventLoop(_EventLoop):
     def __init__(self, widget):
-        self.base_init()
+        super().__init__()
         self._widget = widget
         self._filehandlers = dict()
     
@@ -55,7 +26,7 @@ class EventLoop(BaseEventLoop):
         self._widget.quit()
     
     def default_exception_handler(self, context):
-        BaseEventLoop.default_exception_handler(self, context)
+        super().default_exception_handler(context)
         
         lines = list()
         lines.append(context.pop("message"))
