@@ -144,10 +144,9 @@ class HTTPConnection:
         if sep:
             te.append(prev.rstrip())
         
-        # Replace header fields back into message object
+        if te:
+            raise ValueError("Transfer-Encoding: {}".format(", ".join(te)))
         del msg["Transfer-Encoding"]
-        for i in te:
-            msg["Transfer-Encoding"] = i
         
         return ChunkedResponse(status, reason, msg, self.sock, parser)
 
