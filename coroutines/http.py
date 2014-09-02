@@ -132,7 +132,7 @@ class HTTPConnection:
         te = msg.get_all("Transfer-Encoding", [])
         if not te:
             yield from parser.after_eol()
-            return IdentityResponse(status, reason, msg, self.sock, parser)
+            return _IdentityResponse(status, reason, msg, self.sock, parser)
         
         last = te.pop()
         # TODO: better parsing: eliminate null elements; check for "identity"
@@ -148,7 +148,7 @@ class HTTPConnection:
             raise ValueError("Transfer-Encoding: {}".format(", ".join(te)))
         del msg["Transfer-Encoding"]
         
-        return ChunkedResponse(status, reason, msg, self.sock, parser)
+        return _ChunkedResponse(status, reason, msg, self.sock, parser)
 
 class HTTPResponse:
     def __init__(self, status, reason, msg):
@@ -156,7 +156,7 @@ class HTTPResponse:
         self.reason = reason.decode("latin-1")
         self.msg = msg
 
-class IdentityResponse(HTTPResponse):
+class _IdentityResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
@@ -179,7 +179,7 @@ class IdentityResponse(HTTPResponse):
         self.size -= len(data)
         return data
 
-class ChunkedResponse(HTTPResponse):
+class _ChunkedResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
