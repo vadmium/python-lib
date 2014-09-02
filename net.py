@@ -30,11 +30,13 @@ def Url(scheme="", netloc="", path="", params="", query="", fragment=""):
         scheme, netloc, path, params, query, fragment)
 
 def url_replace(url,
-scheme="", netloc="", path="", params="", query="", fragment=""):
+scheme=None, netloc=None, path=None, params=None, query=None, fragment=None):
     res = list()
     mods = (scheme, netloc, path, params, query, fragment)
-    for [orig, mod] in zip(url, mods):
-        res.append(orig or mod)
+    for [orig, part] in zip(url, mods):
+        if part is None:
+            part = orig
+        res.append(part)
     return urllib.parse.urlunparse(res)
 
 def format_addr(address):
