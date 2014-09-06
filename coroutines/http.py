@@ -132,7 +132,13 @@ class HTTPConnection:
         te = msg.get_all("Transfer-Encoding", [])
         if not te:
             yield from parser.after_eol()
-            return _IdentityResponse(status, reason, msg, self.sock, parser)
+            
+            length = msg.get_all("Content-Length")
+            if length:
+                return _LengthResponse(status, reason, msg,
+                    self.sock, parser, length)
+            else:
+                return _EofResponse(status, reason, msg, self.sock, parser)
         
         last = te.pop()
         # TODO: better parsing: eliminate null elements; check for "identity"
@@ -156,13 +162,27 @@ class HTTPResponse:
         self.reason = reason.decode("latin-1")
         self.msg = msg
 
-class _IdentityResponse(HTTPResponse):
+class _EofResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        length = iter(self.msg.get_all("Content-Length", ()))
-        self.size = int(next(length))
-        for dupe in length:
+        self.data = parser.c
+    
+    def read(self, amt):
+        if self.data is None:
+            data = yield from self.sock.recv(amt)
+        else:
+            data = self.data
+            self.data = None
+        return data
+
+class _LengthResponse(HTTPResponse):
+    def __init__(self, status, reason, msg, sock, parser, lengths):
+        HTTPResponse.__init__(self, status, reason, msg)
+        self.sock = sock
+        lengths = iter(lengths)
+        self.size = int(next(lengths))
+        for dupe in lengths:
             if int(dupe) != self.size:
                 raise HTTPException("Conflicting Content-Length values")
         if self.size:
