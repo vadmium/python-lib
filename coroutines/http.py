@@ -8,6 +8,7 @@ from http.client import (
     UnknownTransferEncoding, UnknownProtocol, HTTPException)
 import http.client
 import email.parser
+import net
 from . import AsyncioGenerator
 
 class HTTPConnection:
@@ -129,29 +130,23 @@ class HTTPConnection:
         
         msg = yield from parser.headers()
         
-        te = msg.get_all("Transfer-Encoding", [])
-        if not te:
+        encodings = net.header_list(msg, "Transfer-Encoding")
+        encoding = next(encodings, None)
+        if not encoding:
             yield from parser.after_eol()
             
-            length = msg.get_all("Content-Length")
-            if length:
-                return _LengthResponse(status, reason, msg,
-                    self.sock, parser, length)
-            else:
+            lengths = net.header_list(msg, "Content-Length")
+            length = next(lengths, None)
+            if length is None:
                 return _EofResponse(status, reason, msg, self.sock, parser)
+            else:
+                return _LengthResponse(status, reason, msg,
+                    self.sock, parser, length, lengths)
         
-        last = te.pop()
-        # TODO: better parsing: eliminate null elements; check for "identity"
-        (prev, sep, last) = last.rpartition(",")
-        if last.strip().lower() != "chunked":
+        # TODO: check for "identity"
+        encodings = next(encodings, None)
+        if encodings is not None or encoding.lower() != "chunked":
             raise UnknownTransferEncoding("Not chunked transfer encoding")
-        
-        # Remove "chunked" from end of header value
-        if sep:
-            te.append(prev.rstrip())
-        
-        if te:
-            raise ValueError("Transfer-Encoding: {}".format(", ".join(te)))
         del msg["Transfer-Encoding"]
         
         return _ChunkedResponse(status, reason, msg, self.sock, parser)
@@ -177,11 +172,10 @@ class _EofResponse(HTTPResponse):
         return data
 
 class _LengthResponse(HTTPResponse):
-    def __init__(self, status, reason, msg, sock, parser, lengths):
+    def __init__(self, status, reason, msg, sock, parser, length, lengths):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        lengths = iter(lengths)
-        self.size = int(next(lengths))
+        self.size = int(length)
         for dupe in lengths:
             if int(dupe) != self.size:
                 raise HTTPException("Conflicting Content-Length values")
