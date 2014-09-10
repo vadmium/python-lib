@@ -69,9 +69,6 @@ class Thread(object):
                     self.event = result.result()
                     self.event.block(self.resume)
                     return
-                elif isinstance(result.result(), Yield):
-                    self.routines.pop()
-                    result = ReturnResult(result.result().send)
                 else:
                     self.routines.append(result.result())
                     result = _startresult
@@ -163,9 +160,17 @@ class Event(object):
         
         self.callback = None
 
-class Yield(object):
-    def __init__(self, send):
-        self.send = send
+class AsyncioGenerator:
+    def next(self, generator):
+        self.yielding = False
+        for result in generator:
+            if self.yielding:
+                return result
+            yield result
+    
+    def generate(self, value=None):
+        self.yielding = True
+        yield value
 
 class Callback(Event):
     """A simple event triggered by calling it

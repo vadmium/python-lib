@@ -7,8 +7,8 @@ API modelled around the built-in "http.client" package
 from http.client import (
     UnknownTransferEncoding, UnknownProtocol, HTTPException)
 import http.client
-import coroutines
 import email.parser
+from . import AsyncioGenerator
 
 class HTTPConnection:
     def __init__(self, sock):
@@ -184,6 +184,7 @@ class ChunkedResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock, parser):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
+        self.chunk_gen = AsyncioGenerator()
         self.chunks = self.Chunks(parser)
         self.size = None
     
@@ -191,7 +192,7 @@ class ChunkedResponse(HTTPResponse):
         if self.size:
             data = yield from self.sock.recv(min(self.size, amt))
         else:
-            (self.size, data) = yield from self.chunks
+            (self.size, data) = yield from self.chunk_gen.next(self.chunks)
         self.size -= len(data)
         return data
     
@@ -228,10 +229,10 @@ class ChunkedResponse(HTTPResponse):
                 yield from self.after_eol()
             
             if not size:
-                yield from coroutines.Yield((0, b""))
+                yield from self.chunk_gen.generate((0, b""))
                 break
             
-            yield from coroutines.Yield((size, parser.c))
+            yield from self.chunk_gen.generate((size, parser.c))
             
             yield from parser.next_char()
         else:
