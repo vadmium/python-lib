@@ -29,7 +29,7 @@ class Form(object):
             self.master.rowconfigure(row, weight=1)
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
-def scroll(view, vert=True, horiz=True, resize=False):
+def scroll(view, vert=True, horiz=True, resize=True):
     kw = dict()
     if resize:
         if not horiz:
