@@ -13,13 +13,12 @@ from . import (Form, Section, Field, Inline)
 from . import (Entry, Button, List, Tree, MenuEntry)
 from functions import setitem
 from tkwrap import grid_row
+from coroutines.tk import EventLoop
 
 class Ttk(object):
     def __init__(self):
         self.root = Tk()
-    
-    def msg_loop(self):
-        self.root.mainloop()
+        self.loop = EventLoop(self.root)
     
     def new_window(self, win, parent=None, *,
     contents, title=None, command=None):
@@ -308,10 +307,6 @@ class Ttk(object):
         if not file:
             return None
         return file
-    
-    def EventDriver(self):
-        from eventgen.tk import Driver
-        return Driver(self.root)
 
 def convert_label(ctrl):
     label = ctrl.label_key()

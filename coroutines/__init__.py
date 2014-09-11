@@ -13,61 +13,13 @@ http://www.weightless.io/
 
 import weakref
 from functions import weakmethod
-from sys import exc_info
-import sys
 from collections import deque
 from functions import WrapperFunction
-from functools import partial
 from contextlib import contextmanager
 from traceback import extract_stack
 from warnings import warn
-
-try:  # Python 3.2
-    ResourceWarning
-except NameError:  # Python < 3.2
-    ResourceWarning = Warning
-
-class Send(object):
-    def __init__(self, value=None):
-        self.value = value
-    def result(self):
-        return self.value
-    def sendcall(self, gen):
-        return partial(gen.send, self.value)
-    def genresult(self):
-        return StopIteration(self.value)
-    def default(self):
-        sys.displayhook(self.value)
-
-class Throw(object):
-    def __init__(self, *exc):
-        try:
-            (exc,) = exc
-        except ValueError:
-            self.exc = list(exc)
-        else:
-            self.exc = [type(exc), exc, getattr(exc, "__traceback__", None)]
-    
-    def with_traceback(self, tb):
-        try:
-            self.exc[1].with_traceback(tb)
-        except AttributeError:
-            pass
-        self.exc[2] = tb
-        return self
-    
-    def result(self):
-        #~ # Hack to include traceback in Python 2:
-        #~ raise self.exc[0], self.exc[1], self.exc[2]
-        raise self.exc[1]
-    def sendcall(self, gen):
-        # Traceback from first parameter apparently ignored
-        return partial(gen.throw, *self.exc)
-    def genresult():
-        #~ self.result()  # Python 2 hack
-        return self.exc[1]
-    def default(self):
-        sys.excepthook(*self.exc)
+from .results import ReturnResult, RaiseResult, call_result
+from asyncio import Task
 
 class routine(WrapperFunction):
     """Decorator converting generator factory into Thread() factory"""
@@ -95,57 +47,37 @@ class Thread(object):
         self.reapers = list()
         self.routines = [routine]
         with firedoor(self):
-            self.trampoline(Send())
+            self.trampoline(_startresult)
     
     @weakmethod
-    def resume(self, result=Send()):
+    def resume(self, result=ReturnResult()):
         self.event.close()
         self.trampoline(result)
     
     def trampoline(self, result):
-        tb = None  # For seamless deletion at end
-        
-        try:
-            while self.routines:
-                call = result.sendcall(self.routines[-1])
-                try:
-                    obj = call()
-                except BaseException as e:
-                    self.routines.pop()
-                    if isinstance(e, StopIteration):
-                        result = Send(*e.args)
-                    else:
-                        # Saving traceback creates circular reference
-                        result = Throw(*exc_info())
-                        
-                        # Remove our throw or send call from traceback, but
-                        # only if there is more traceback
-                        tb = result.exc[2].tb_next
-                        if tb:
-                            result.with_traceback(tb)
-                
-                else:
-                    if isinstance(obj, Event):
-                        self.event = obj
-                        self.event.block(self.resume)
-                        return
-                    elif isinstance(obj, Yield):
-                        self.routines.pop()
-                        result = Send(obj.send)
-                    else:
-                        self.routines.append(obj)
-                        result = Send()
+        while self.routines:
+            call = result.resume_call(self.routines[-1])
+            result = Result.from_call(call)
             
-            if self.result:
-                self.result = result
-            else:
-                result.default()
-            self.close()
+            if isinstance(result, RaiseResult):
+                self.routines.pop()
+                if isinstance(result.exception(), StopIteration):
+                    result = ReturnResult(*result.exception().args)
+            
+            elif isinstance(result, ReturnResult):
+                if isinstance(result.result(), Event):
+                    self.event = result.result()
+                    self.event.block(self.resume)
+                    return
+                else:
+                    self.routines.append(result.result())
+                    result = _startresult
         
-        finally:
-            # Break circular reference if traceback includes this function
-            del tb
-            del result
+        if self.result:
+            self.result = result
+        else:
+            result.display()
+        self.close()
     
     def close(self):
         if self.routines:
@@ -167,7 +99,7 @@ class Thread(object):
             yield r
         
         if self.result:
-            raise self.result.genresult()
+            raise self.result.exit_generator()
     
     def __repr__(self):
         return "<{0} {1:#x}>".format(type(self).__name__, id(self))
@@ -182,6 +114,25 @@ class Thread(object):
             if limit is not None and not limit:
                 break
         return stack
+
+# Imitation Result object to start a generator by invoking send(None)
+_startresult = ReturnResult(None)
+
+class MainTask(Task):
+    """Task that is not expected to return a value or exception"""
+    
+    def __init__(self, *pos, loop, **kw):
+        Task.__init__(self, *pos, loop=loop, **kw)
+        self.loop = loop
+        self.add_done_callback(type(self)._on_done)
+    
+    def _on_done(self):
+        exc = self.exception()
+        if exc:
+            self.loop.call_exception_handler(dict(
+                message="Exception in {!r}".format(self),
+                exception=exc,
+            ))
 
 class Event(object):
     """Base class that a thread can yield to wait for an event
@@ -209,9 +160,17 @@ class Event(object):
         
         self.callback = None
 
-class Yield(object):
-    def __init__(self, send):
-        self.send = send
+class AsyncioGenerator:
+    def next(self, generator):
+        self.yielding = False
+        for result in generator:
+            if self.yielding:
+                return result
+            yield result
+    
+    def generate(self, value=None):
+        self.yielding = True
+        yield value
 
 class Callback(Event):
     """A simple event triggered by calling it
@@ -221,7 +180,7 @@ class Callback(Event):
         Positional arguments passed to the callback are yielded from the
         event as a tuple
         """
-        self.callback(Send(args))
+        self.callback(ReturnResult(args))
 
 class Queue(Event):
     """An event that may be triggered before it is armed (message queue)
@@ -231,12 +190,12 @@ class Queue(Event):
         self.queue = deque()
     
     def send(self, value=None):
-        self.queue.append(dict(ret=value))
+        self.queue.append(ReturnResult(value))
         if self.callback is not None:
             self.callback()
     
     def throw(self, exc):
-        self.queue.append(dict(exc=exc))
+        self.queue.append(RaiseResult(exc))
         if self.callback is not None:
             self.callback()
     
@@ -251,13 +210,7 @@ class Queue(Event):
             item = self.queue.popleft()
         except LookupError:
             raise StopIteration()
-        
-        try:
-            exc = item["exc"]
-        except LookupError:
-            return item["ret"]
-        else:
-            raise exc
+        return item.result()
     next = __next__
     
     def __len__(self):
@@ -301,9 +254,9 @@ class Subevent(object):
         self.event = event
     
     @weakmethod
-    def trigger(self, result=Send()):
-        if not isinstance(result, Throw):
-            result = Send((self.event, result.result()))
+    def trigger(self, result=ReturnResult()):
+        if isinstance(result, ReturnResult):
+            result = ReturnResult((self.event, result.result()))
         self.set().callback(result)
 
 class FileEvent(Event):

@@ -1,10 +1,4 @@
-from collections import namedtuple
 from contextlib import contextmanager
-
-try:
-    import builtins
-except ImportError:
-    import __builtin__ as builtins
 
 try:
     from types import SimpleNamespace
@@ -18,11 +12,6 @@ except ImportError:
                 ", ".join("{0}={1!r}".format(name, value)
                 for (name, value) in self.__dict__.items()))
 
-def assimilate(name, fromlist):
-    module = __import__(name, fromlist=fromlist)
-    for name in fromlist:
-        setattr(builtins, name, getattr(module, name))
-
 def strip(s, start="", end=""):
     if start and not s.startswith(start):
         raise ValueError("Expected {0!r} starting string".format(start))
@@ -33,30 +22,5 @@ def strip(s, start="", end=""):
             "String not enclosed by {0!r} and {1!r}".format(start, end))
     return s[len(start):len(s) - len(end)]
 
-FieldType = namedtuple("Field", "key, value")
-def Field(**kw):
-    """Sugary syntax for creating a (key, value) tuple"""
-    (field,) = kw.items()
-    return FieldType(*field)
-
-def itemkey(item):
-    (key, value) = item
-    return key
-
 def bitmask(size):
     return ~(~0 << size)
-
-@contextmanager
-def substattr(obj, attr, *value):
-    if value:
-        (value,) = value
-    else:
-        value = attr
-        attr = attr.__name__
-    
-    orig = getattr(obj, attr)
-    try:
-        setattr(obj, attr, value)
-        yield value
-    finally:
-        setattr(obj, attr, orig)
