@@ -3,7 +3,6 @@ from __future__ import print_function
 import sys
 from collections import Set
 import inspect
-from sys import stderr
 from functions import setitem
 from collections import OrderedDict
 
@@ -219,7 +218,7 @@ def convert(types, param, arg):
     except ValueError as err:
         raise SystemExit("{!r} parameter: {}".format(param.name, err))
 
-def help(func=None, file=stderr, param_types=dict()):
+def help(func=None, file=sys.stderr, param_types=dict()):
     (func, sig, keywords, param_types) = prepare(func, param_types)
     
     (summary, body) = splitdoc(inspect.getdoc(func))
