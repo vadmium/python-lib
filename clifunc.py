@@ -87,6 +87,12 @@ except ImportError:  # Python < 3.3
         def __len__(self):
             return len(frozenset().union(*self.maps))
 
+def public(api):
+    sys.modules[api.__module__].__all__.append(api.__name__)
+    return api
+__all__ = list()
+
+@public
 def run(func=None, args=None, param_types=dict()):
     """Invokes a function using CLI arguments
     
@@ -218,6 +224,7 @@ def convert(types, param, arg):
     except ValueError as err:
         raise SystemExit("{!r} parameter: {}".format(param.name, err))
 
+@public
 def help(func=None, file=sys.stderr, param_types=dict()):
     (func, sig, keywords, param_types) = prepare(func, param_types)
     
@@ -355,6 +362,7 @@ def multi_param(param):
     return (isinstance(param.default, (tuple, list, Set)) and
         not param.default)
 
+@public
 def main():
     import importlib
     from types import ModuleType
