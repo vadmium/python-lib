@@ -24,3 +24,6 @@ def strip(s, start="", end=""):
 
 def bitmask(size):
     return ~(~0 << size)
+
+def chunks(size, chunking):
+    return -(-size // chunking)
