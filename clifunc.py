@@ -126,7 +126,6 @@ def run(func=None, args=None, param_types=dict()):
     http://dev.kylealanhale.com/wiki/projects/quicli: very decorator-happy,
         with much "argparse" API and little automatic introspection
     """
-    # return value could be str or int -> System exit
     
     (func, sig, keywords, param_types) = prepare(func, param_types)
     varpos = param_kind(sig, Parameter.VAR_POSITIONAL)
@@ -399,4 +398,4 @@ If the function name is omitted, the main() function is called.""")
     return run(func, sys.argv[2:])
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
