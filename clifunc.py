@@ -5,6 +5,7 @@ from collections import Set
 import inspect
 from functions import setitem
 from collections import OrderedDict
+from functions import attributes
 
 try:  # Python 3.3
     from inspect import signature, Parameter
@@ -106,7 +107,11 @@ def run(func=None, args=None, param_types=dict()):
         unconverted strings. The special keywords "*" and "**" apply to any
         excess positional and keyword arguments.
     
-    The command option names are the parameter keywords, and hyphenated (-)
+    If the function has the "subcommand_namespace" attribute set to True, a
+    further subcommand function will be invoked based on the return value and
+    additional CLI arguments.
+    
+    The CLI option names are the parameter keywords, and hyphenated (-)
     option names are interpreted as using underscores (_) instead. Options
     may be prefixed with either a single (-) or a double (--) dash. An
     option's argument may be separated by an equals sign (=) or may be in a
@@ -212,7 +217,17 @@ def run(func=None, args=None, param_types=dict()):
     except TypeError as err:
         raise SystemExit(err)
     
-    return func(*positional, **opts)
+    result = func(*positional, **opts)
+    if not getattr(func, "subcommand_namespace", False):
+        return result
+    
+    if arg is None:
+        for func in dir(result):
+            func = getattr(result, func)
+            if callable(func):
+                help(func)
+    else:
+        return run(getattr(result, arg), args)
 
 def convert(types, param, arg):
     convert = types.get(param.name)
@@ -364,38 +379,16 @@ def multi_param(param):
         not param.default)
 
 @public
-def main():
+@attributes(subcommand_namespace=True)
+def import_module(module):
+    """Calls a function from a Python module"""
+    
     import importlib
-    from types import ModuleType
     
-    if len(sys.argv) < 2 or sys.argv[1] in {"-help", "--help", "-h"}:
-        print("""\
-Calls a function from a Python module
-
-parameters: <module>[.function] [arguments | -help]
-
-If the function name is omitted, the main() function is called.""")
-        return
-    
-    name = sys.argv[1]
-    
-    (module, sep, attr) = name.rpartition(".")
     try:
-        if sep:
-            func = getattr(importlib.import_module(module), attr, None)
-        else:
-            func = None
-        if func is None:
-            func = importlib.import_module(name)
+        return importlib.import_module(module)
     except ImportError as err:
         raise SystemExit(err)
-    
-    if isinstance(func, ModuleType):
-        func = getattr(func, "main", None)
-        if func is None:
-            raise SystemExit("Module {} has no main() function".format(name))
-    
-    return run(func, sys.argv[2:])
 
 if __name__ == "__main__":
-    main()
+    run(import_module)
