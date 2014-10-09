@@ -123,7 +123,8 @@ def run(func=None, args=None, param_types=dict()):
     
     """Similar implementations:
     https://pypi.python.org/pypi/clize: adapts the function in two steps
-    http://dev.kylealanhale.com/wiki/projects/quicli: very decorator-happy, with much "argparse" API and little automatic introspection
+    http://dev.kylealanhale.com/wiki/projects/quicli: very decorator-happy,
+        with much "argparse" API and little automatic introspection
     """
     # return value could be str or int -> System exit
     
@@ -148,9 +149,8 @@ def run(func=None, args=None, param_types=dict()):
     args = iter(args)
     endopts = False
     while True:
-        try:
-            arg = next(args)
-        except StopIteration:
+        arg = next(args, None)
+        if arg is None:
             break
         if arg == "--":
             endopts = True
