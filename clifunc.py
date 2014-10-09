@@ -344,10 +344,12 @@ def prepare(func=None, param_types=dict()):
         param in sig.parameters.values() if param.kind in keyword_kinds)
     
     param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
-    for param in param_types:
-        if param not in sig.parameters:
-            raise TypeError("{func.__name__}() does not have "
-                "a parameter called {param!r}".format(**locals()))
+    # Explicit set() construction to work around Python 2's keys() lists
+    missing = set(param_types.keys()).difference(sig.parameters.keys())
+    if missing:
+        missing = ", ".join(map(repr, missing))
+        msg = "{}() missing parameters: {}".format(func.__name__, missing)
+        raise TypeError(msg)
     
     return (func, sig, keywords, param_types)
 
