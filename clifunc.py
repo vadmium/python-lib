@@ -97,8 +97,7 @@ def run(func=None, args=None, param_types=dict()):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
-    args: Defaults to sys.argv[1:]. If specified, the command name shown in
-        help is taken from func.__name__; otherwise, from sys.argv[0].
+    args: Defaults to sys.argv[1:]
     param_types:  This mapping extends and overrides any "param_types"
         attribute of "func". The parameter and attribute both map parameter
         keywords to functions taking an argument string and returning the
