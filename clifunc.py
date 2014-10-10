@@ -128,7 +128,7 @@ def run(func=None, args=None, param_types=dict()):
     """
     # return value could be str or int -> System exit
     
-    (func, sig, keywords, param_types) = prepare(func, param_types)
+    [func, sig, keywords, param_types] = prepare(func, param_types)
     varpos = param_kind(sig, Parameter.VAR_POSITIONAL)
     varkw = param_kind(sig, Parameter.VAR_KEYWORD)
     
@@ -165,7 +165,7 @@ def run(func=None, args=None, param_types=dict()):
             
             # Allow argument to be separated by equals sign
             try:
-                (opt, arg) = opt.split("=")
+                [opt, arg] = opt.split("=")
             except ValueError:
                 arg = None
             
@@ -226,9 +226,9 @@ def convert(types, param, arg):
 
 @public
 def help(func=None, file=sys.stderr, param_types=dict()):
-    (func, sig, keywords, param_types) = prepare(func, param_types)
+    [func, sig, keywords, param_types] = prepare(func, param_types)
     
-    (summary, body) = splitdoc(inspect.getdoc(func))
+    [summary, body] = splitdoc(inspect.getdoc(func))
     if summary:
         print(summary, file=file)
     
