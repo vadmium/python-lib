@@ -230,11 +230,11 @@ def help(func=None, file=sys.stderr, param_types=dict()):
     
     [summary, body] = splitdoc(inspect.getdoc(func))
     if summary:
-        print(summary, file=file)
+        file.writelines((summary, "\n"))
     
     if sig.parameters:
         if summary:
-            print(file=file)
+            file.write("\n")
         file.write("parameters:")
         
         for param in sig.parameters.values():
@@ -253,15 +253,15 @@ def help(func=None, file=sys.stderr, param_types=dict()):
                 first = False
             file.write(" {}={!s}".format(option(param.name), param.default))
         
-        print(file=file)
+        file.write("\n")
     
     if body is not None:
         if summary or sig.parameters:
-            print(file=file)
-        print(body, file=file)
+            file.write("\n")
+        file.writelines((body, "\n"))
     
     if not summary and not sig.parameters and not body:
-        print("no parameters", file=file)
+        file.write("no parameters\n")
 
 def splitdoc(doc):
     """Returns a tuple (summary, body) for a docstring
