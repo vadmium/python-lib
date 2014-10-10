@@ -222,12 +222,29 @@ def run(func=None, args=None, param_types=dict()):
         return result
     
     if arg is None:
-        for func in dir(result):
-            func = getattr(result, func)
-            if callable(func):
-                help(func)
+        funcs = getattr(result, "__all__", None)
+        if funcs is None:
+            funcs = dir(result)
+        if funcs:
+            sys.stderr.write("subcommands:\n")
+        else:
+            sys.stderr.write("no subcommands found\n")
+        for name in funcs:
+            func = getattr(result, name)
+            if not callable(func):
+                continue
+            sys.stderr.write(name)
+            [summary, _] = splitdoc(inspect.getdoc(func))
+            if summary:
+                sys.stderr.writelines((": ", summary))
+            sys.stderr.write("\n")
     else:
-        return run(getattr(result, arg), args)
+        try:
+            func = getattr(result, arg)
+        except AttributeError as err:
+            err = "Invalid subcommand {!r}: {}".format(arg, err)
+            raise SystemExit(err)
+        return run(func, args)
 
 def convert(types, param, arg):
     convert = types.get(param.name)
