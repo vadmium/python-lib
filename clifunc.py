@@ -248,22 +248,28 @@ def run(func=None, args=None, param_types=dict()):
         return result
     
     if arg is None:
-        funcs = getattr(result, "__all__", None)
-        if funcs is None:
+        all = getattr(result, "__all__", None)
+        if all is None:
             funcs = dir(result)
-        if funcs:
-            sys.stderr.write("subcommands:\n")
         else:
-            sys.stderr.write("no subcommands found\n")
+            funcs = all
+        heading = False
         for name in funcs:
+            if all is None and name.startswith("_"):
+                continue
             func = getattr(result, name)
             if not callable(func):
                 continue
+            if not heading:
+                sys.stderr.write("public subcommands:\n")
+                heading = True
             sys.stderr.write(name)
             [summary, _] = splitdoc(inspect.getdoc(func))
             if summary:
                 sys.stderr.writelines((": ", summary))
             sys.stderr.write("\n")
+        if not heading:
+            sys.stderr.write("no public subcommands found\n")
     else:
         with ExitStack() as cleanup:
             if getattr(func, "subcommand_context", False):
