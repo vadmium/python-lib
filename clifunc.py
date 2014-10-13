@@ -88,6 +88,22 @@ except ImportError:  # Python < 3.3
         def __len__(self):
             return len(frozenset().union(*self.maps))
 
+try:  # Python 3.3
+    from contextlib import ExitStack
+except ImportError:  # Python < 3.3
+    from misc import Context
+    class ExitStack(Context):
+        def __init__(self):
+            self.exit = None
+        
+        def enter_context(self, context):
+            self.exit = context.__exit__
+            return context.__enter__()
+        
+        def __exit__(self, *exc):
+            if self.exit:
+                return self.exit(*exc)
+
 def public(api):
     sys.modules[api.__module__].__all__.append(api.__name__)
     return api
@@ -110,6 +126,12 @@ def run(func=None, args=None, param_types=dict()):
     If the function has the "subcommand_namespace" attribute set to True, a
     further subcommand function will be invoked based on the return value and
     additional CLI arguments.
+    
+    If the function has the "subcommand_class" attribute set, a subcommand
+    will be expected, and will invoke a method listed in the class. If the
+    function has the "subcommand_context" attribute set to True, the return
+    value will be entered as a context manager before running the subcommand,
+    otherwise the subcommand will invoke a method on the return value.
     
     The CLI option names are the parameter keywords, and hyphenated (-)
     option names are interpreted as using underscores (_) instead. Options
@@ -204,6 +226,9 @@ def run(func=None, args=None, param_types=dict()):
         
         else:
             param = next(pos_iter, varpos)
+            if hasattr(func, "subcommand_class") and (
+            param is varpos or param.default is not Parameter.empty):
+                break
             if param is not None:
                 arg = convert(param_types, param, arg)
             positional.append(arg)
@@ -218,7 +243,8 @@ def run(func=None, args=None, param_types=dict()):
         raise SystemExit(err)
     
     result = func(*positional, **opts)
-    if not getattr(func, "subcommand_namespace", False):
+    if (not getattr(func, "subcommand_namespace", False) and
+    not hasattr(func, "subcommand_class")):
         return result
     
     if arg is None:
@@ -239,12 +265,15 @@ def run(func=None, args=None, param_types=dict()):
                 sys.stderr.writelines((": ", summary))
             sys.stderr.write("\n")
     else:
-        try:
-            func = getattr(result, arg)
-        except AttributeError as err:
-            err = "Invalid subcommand {!r}: {}".format(arg, err)
-            raise SystemExit(err)
-        return run(func, args)
+        with ExitStack() as cleanup:
+            if getattr(func, "subcommand_context", False):
+                result = cleanup.enter_context(result)
+            try:
+                func = getattr(result, arg)
+            except AttributeError as err:
+                err = "Invalid subcommand {!r}: {}".format(arg, err)
+                raise SystemExit(err)
+            return run(func, args)
 
 def convert(types, param, arg):
     convert = types.get(param.name)
