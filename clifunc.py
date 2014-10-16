@@ -127,11 +127,13 @@ def run(func=None, args=None, param_types=dict()):
     further subcommand function will be invoked based on the return value and
     additional CLI arguments.
     
+    If the function has a "cli_context" attribute set to True, the return
+    value is entered as a context manager. Any further return value handling
+    uses the result returned when entering the context manager.
+    
     If the function has the "subcommand_class" attribute set, a subcommand
-    will be expected, and will invoke a method listed in the class. If the
-    function has the "subcommand_context" attribute set to True, the return
-    value will be entered as a context manager before running the subcommand,
-    otherwise the subcommand will invoke a method on the return value.
+    will be expected, and will invoke a method listed in the class on the
+    function or context manager result.
     
     The CLI option names are the parameter keywords, and hyphenated (-)
     option names are interpreted as using underscores (_) instead. Options
@@ -243,37 +245,37 @@ def run(func=None, args=None, param_types=dict()):
         raise SystemExit(err)
     
     result = func(*positional, **opts)
-    if (not getattr(func, "subcommand_namespace", False) and
-    not hasattr(func, "subcommand_class")):
-        return result
-    
-    if arg is None:
-        all = getattr(result, "__all__", None)
-        if all is None:
-            funcs = dir(result)
-        else:
-            funcs = all
-        heading = False
-        for name in funcs:
-            if all is None and name.startswith("_"):
-                continue
-            func = getattr(result, name)
-            if not callable(func):
-                continue
+    with ExitStack() as cleanup:
+        if getattr(func, "cli_context", False):
+            result = cleanup.enter_context(result)
+        if (not getattr(func, "subcommand_namespace", False) and
+        not hasattr(func, "subcommand_class")):
+            return result
+        
+        if arg is None:
+            all = getattr(result, "__all__", None)
+            if all is None:
+                funcs = dir(result)
+            else:
+                funcs = all
+            heading = False
+            for name in funcs:
+                if all is None and name.startswith("_"):
+                    continue
+                func = getattr(result, name)
+                if not callable(func):
+                    continue
+                if not heading:
+                    sys.stderr.write("public subcommands:\n")
+                    heading = True
+                sys.stderr.write(name)
+                [summary, _] = splitdoc(inspect.getdoc(func))
+                if summary:
+                    sys.stderr.writelines((": ", summary))
+                sys.stderr.write("\n")
             if not heading:
-                sys.stderr.write("public subcommands:\n")
-                heading = True
-            sys.stderr.write(name)
-            [summary, _] = splitdoc(inspect.getdoc(func))
-            if summary:
-                sys.stderr.writelines((": ", summary))
-            sys.stderr.write("\n")
-        if not heading:
-            sys.stderr.write("no public subcommands found\n")
-    else:
-        with ExitStack() as cleanup:
-            if getattr(func, "subcommand_context", False):
-                result = cleanup.enter_context(result)
+                sys.stderr.write("no public subcommands found\n")
+        else:
             try:
                 func = getattr(result, arg)
             except AttributeError as err:
