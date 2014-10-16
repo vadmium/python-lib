@@ -5,7 +5,6 @@ from collections import Set
 import inspect
 from functions import setitem
 from collections import OrderedDict
-from functions import attributes
 
 try:  # Python 3.3
     from inspect import signature, Parameter
@@ -110,7 +109,7 @@ def public(api):
 __all__ = list()
 
 @public
-def run(func=None, args=None, param_types=dict()):
+def run(func=None, args=None, param_types=dict(), cli_result=False):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
@@ -122,10 +121,9 @@ def run(func=None, args=None, param_types=dict()):
         parameter's data type. By default, arguments are passed to "func" as
         unconverted strings. The special keywords "*" and "**" apply to any
         excess positional and keyword arguments.
-    
-    If the function has the "subcommand_namespace" attribute set to True, a
-    further subcommand function will be invoked based on the return value and
-    additional CLI arguments.
+    cli_result: If true, the function or context manager result will be
+        displayed, or will have a method invoked as a subcommand. A
+        subcommand is invoked by passing an extra positional argument.
     
     If the function has a "cli_context" attribute set to True, the return
     value is entered as a context manager. Any further return value handling
@@ -228,7 +226,7 @@ def run(func=None, args=None, param_types=dict()):
         
         else:
             param = next(pos_iter, varpos)
-            if hasattr(func, "subcommand_class") and (
+            if (cli_result or hasattr(func, "subcommand_class")) and (
             param is varpos or param.default is not Parameter.empty):
                 break
             if param is not None:
@@ -248,9 +246,11 @@ def run(func=None, args=None, param_types=dict()):
     with ExitStack() as cleanup:
         if getattr(func, "cli_context", False):
             result = cleanup.enter_context(result)
-        if (not getattr(func, "subcommand_namespace", False) and
-        not hasattr(func, "subcommand_class")):
+        if not cli_result and not hasattr(func, "subcommand_class"):
             return result
+        if arg is None:
+            sys.displayhook(result)
+            return
         
         if arg is None:
             all = getattr(result, "__all__", None)
@@ -281,7 +281,7 @@ def run(func=None, args=None, param_types=dict()):
             except AttributeError as err:
                 err = "Invalid subcommand {!r}: {}".format(arg, err)
                 raise SystemExit(err)
-            return run(func, args)
+            return run(func, args, cli_result=cli_result)
 
 def convert(types, param, arg):
     convert = types.get(param.name)
@@ -433,7 +433,6 @@ def multi_param(param):
         not param.default)
 
 @public
-@attributes(subcommand_namespace=True)
 def import_module(module):
     """Calls a function from a Python module"""
     
@@ -445,4 +444,4 @@ def import_module(module):
         raise SystemExit(err)
 
 if __name__ == "__main__":
-    run(import_module)
+    run(import_module, cli_result=True)
