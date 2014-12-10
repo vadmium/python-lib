@@ -134,10 +134,13 @@ def run(func=None, args=None, param_types=dict()):
     if args is None:
         args = sys.argv[1:]
     
-    auto_help = varkw is None and "help" not in keywords
-    if auto_help:
-        param = Parameter("help", Parameter.KEYWORD_ONLY, default=False)
-        keywords[param.name] = param
+    auto_help = list()
+    if varkw is None:
+        for opt in ("help", "h"):
+            if opt not in keywords:
+                auto_help.append(opt)
+                param = Parameter(opt, Parameter.KEYWORD_ONLY, default=False)
+                keywords[opt] = param
     
     if sig:
         pos_kinds = (
@@ -211,7 +214,7 @@ def run(func=None, args=None, param_types=dict()):
                 arg = convert(param_types, param, arg)
             positional.append(arg)
     
-    if auto_help and opts.get("help", False):
+    if any(opts.get(help, False) for help in auto_help):
         help(func, param_types=param_types)
         return
     
