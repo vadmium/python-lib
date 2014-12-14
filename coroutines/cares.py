@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import cares
 from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
@@ -45,18 +43,18 @@ async def name_connect(event_driver, address, Socket, *,
     
     else:
         if resolved:
-            raise EnvironmentError("All addresses unconnectable: {0}".format(
+            raise EnvironmentError("All addresses unconnectable: {}".format(
                 hostname))
         else:
-            raise EnvironmentError("Failure resolving {0}".format(hostname))
+            raise EnvironmentError("Failure resolving {}".format(hostname))
 
-class MessageCallback(object):
+class MessageCallback:
     def __init__(self, callback):
         self.callback = callback
     def lookingup(self, name, family):
-        self.callback("Looking up {0} (family {1})".format(name, family))
+        self.callback("Looking up {} (family {})".format(name, family))
     def connecting(self, address):
-        self.callback("Connecting to {0}:{1}".format(*address))
+        self.callback("Connecting to {}:{}".format(*address))
 
 async def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(loop=event_driver)

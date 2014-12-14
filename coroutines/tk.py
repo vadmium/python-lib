@@ -93,6 +93,6 @@ class Timer(Event):
     
     def __del__(self):
         if self.timer:
-            warn(ResourceWarning("Timer {0!r} left running".format(self)),
+            warn(ResourceWarning("Timer {!r} left running".format(self)),
                 stacklevel=2)
             self.stop()

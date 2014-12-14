@@ -155,7 +155,7 @@ class MainTask(asyncio.Task):
                 exception=exc,
             ))
 
-class Event(object):
+class Event:
     """Base class that a thread can yield to wait for an event
     
     The default implementation has a "callback" attribute which can be called
@@ -280,7 +280,7 @@ class Subevent(object):
             result = ReturnResult((self.event, result.result()))
         self.set().callback(result)
 
-class constructor(object):
+class constructor:
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
     def __init__(self, cls):
         self.cls = cls
@@ -289,7 +289,7 @@ class constructor(object):
         yield o.__init__(*args, **kw)
         raise StopIteration(o)
 
-class Lock(object):
+class Lock:
     def __init__(self):
         self.locked = False
         self.waiting = []
@@ -303,7 +303,7 @@ class Lock(object):
         with cascade:
             self.locked = True
 
-class LockContext(object):
+class LockContext:
     def __init__(self, lock):
         self.lock = lock
     def  __enter__(self):
@@ -321,7 +321,7 @@ class LockContext(object):
         returns the context via StopIteration"""
         return LockCascade(self)
 
-class LockCascade(object):
+class LockCascade:
     def __init__(self, context):
         self.context = context
     def __enter__(self):
