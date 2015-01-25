@@ -2,17 +2,16 @@
 
 from unittest import TestCase
 from io import BytesIO, BufferedReader
-from iview.utils import fastforward
 from errno import ECONNREFUSED
-
-import iview.utils
+import net
 import urllib.request
 import http.client
+from unittest.mock import patch
 
 class TestPersistentHttp(TestCase):
     def setUp(self):
         TestCase.setUp(self)
-        self.connection = iview.utils.PersistentConnectionHandler()
+        self.connection = net.PersistentConnectionHandler()
         self.addCleanup(self.connection.close)
         self.session = urllib.request.build_opener(self.connection)
 
@@ -35,7 +34,8 @@ class TestLoopbackHttp(TestPersistentHttp):
             
             def do_POST(handler):
                 length = int(handler.headers["Content-Length"])
-                fastforward(handler.rfile, length)
+                while length > 0:
+                    length -= len(handler.rfile.read(min(length, 0x10000)))
                 
                 handler.send_response(200)
                 handler.send_header("Content-Length", format(6))
@@ -104,7 +104,7 @@ class TestLoopbackHttp(TestPersistentHttp):
 
 class TestMockHttp(TestPersistentHttp):
     def run(self, *pos, **kw):
-        with substattr(iview.utils.http.client, self.HTTPConnection):
+        with patch("http.client.HTTPConnection", self.HTTPConnection):
             return TestPersistentHttp.run(self, *pos, **kw)
 
 class TestHttpSocket(TestMockHttp):
