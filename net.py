@@ -164,22 +164,21 @@ class Server(BaseServer, Context):
 class PersistentConnectionHandler(urllib.request.BaseHandler):
     """URL handler for HTTP persistent connections
     
-    connection = PersistentConnectionHandler()
-    session = urllib.request.build_opener(connection)
-    
-    # First request opens connection
-    with session.open("http://localhost/one") as response:
-        response.read()
-    
-    # Subsequent requests reuse the existing connection, unless it got closed
-    with session.open("http://localhost/two") as response:
-        response.read()
-    
-    # Closes old connection when new host specified
-    with session.open("http://example/three") as response:
-        response.read()
-    
-    connection.close()  # Frees socket
+    with PersistentConnectionHandler(timeout=10) as connection:
+        session = urllib.request.build_opener(connection)
+        
+        # First request opens connection
+        with session.open("http://localhost/one") as response:
+            response.read()
+        
+        # Subsequent requests reuse existing connection, unless it got closed
+        with session.open("http://localhost/two") as response:
+            response.read()
+        
+        # Closes old connection when new host specified
+        with session.open("http://example/three") as response:
+            response.read()
+    # Socket freed at context manager exit
     
     Currently does not reuse an existing connection if
     two host names happen to resolve to the same Internet address.
