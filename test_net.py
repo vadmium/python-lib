@@ -105,7 +105,8 @@ class TestLoopbackHttp(TestPersistentHttp):
 class TestMockHttp(TestPersistentHttp):
     def setUp(self):
         super().setUp()
-        patcher = patch("http.client.HTTPConnection", self.HTTPConnection)
+        entry = {"mock": self.HTTPConnection}
+        patcher = patch.dict(self.connection.conn_classes, entry)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -137,12 +138,12 @@ class TestHttpSocket(TestMockHttp):
     
     def test_reuse(self):
         """Test existing connection is reused"""
-        with self.session.open("http://localhost/one") as response:
+        with self.session.open("mock://localhost/one") as response:
             self.assertEqual(b"First body\r\n", response.read())
         sock = self.connection._connection.sock
         self.assertTrue(sock.reader, "Disconnected after first request")
         
-        with self.session.open("http://localhost/two") as response:
+        with self.session.open("mock://localhost/two") as response:
             self.assertEqual(b"Second body\r\n", response.read())
         self.assertIs(sock, self.connection._connection.sock,
             "Socket connection changed")
@@ -150,12 +151,12 @@ class TestHttpSocket(TestMockHttp):
     
     def test_new_host(self):
         """Test connecting to second host"""
-        with self.session.open("http://localhost/one") as response:
+        with self.session.open("mock://localhost/one") as response:
             self.assertEqual(b"First body\r\n", response.read())
         sock1 = self.connection._connection.sock
         self.assertTrue(sock1.reader, "Disconnected after first request")
         
-        with self.session.open("http://otherhost/two") as response:
+        with self.session.open("mock://otherhost/two") as response:
             self.assertEqual(b"First body\r\n", response.read())
         sock2 = self.connection._connection.sock
         self.assertIsNot(sock1, sock2, "Expected new socket connection")
@@ -175,7 +176,7 @@ class TestHttpEstablishError(TestMockHttp):
         exception = EnvironmentError(ECONNREFUSED, "Mock connection refusal")
         self.HTTPConnection.connect_exception = exception
         try:
-            self.session.open("http://dummy")
+            self.session.open("mock://dummy")
         except http.client.HTTPException:
             raise
         except EnvironmentError as err:
