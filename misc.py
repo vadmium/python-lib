@@ -181,4 +181,4 @@ class UnicodeMap(Mapping):
     def __getitem__(self, cp):
         return self.map_char(chr(cp))
     def map_char(self, char):
-        raise KeyError()
+        raise super().__getitem__(ord(char))
