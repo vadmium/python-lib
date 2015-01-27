@@ -103,9 +103,11 @@ class TestLoopbackHttp(TestPersistentHttp):
             "Server handle() retried for POST")
 
 class TestMockHttp(TestPersistentHttp):
-    def run(self, *pos, **kw):
-        with patch("http.client.HTTPConnection", self.HTTPConnection):
-            return TestPersistentHttp.run(self, *pos, **kw)
+    def setUp(self):
+        super().setUp()
+        patcher = patch("http.client.HTTPConnection", self.HTTPConnection)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
 class TestHttpSocket(TestMockHttp):
     class HTTPConnection(http.client.HTTPConnection):
