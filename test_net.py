@@ -11,9 +11,9 @@ from unittest.mock import patch
 class TestPersistentHttp(TestCase):
     def setUp(self):
         TestCase.setUp(self)
-        self.connection = net.PersistentConnectionHandler()
-        self.addCleanup(self.connection.close)
-        self.session = urllib.request.build_opener(self.connection)
+        self.handler = net.PersistentConnectionHandler()
+        self.addCleanup(self.handler.close)
+        self.urlopen = urllib.request.build_opener(self.handler).open
 
 class TestLoopbackHttp(TestPersistentHttp):
     def setUp(self):
@@ -59,47 +59,47 @@ class TestLoopbackHttp(TestPersistentHttp):
 
     def test_reuse(self):
         """Test existing connection is reused"""
-        with self.session.open(self.url + "/initial-request") as response:
+        with self.urlopen(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
-        with self.session.open(self.url + "/second-request") as response:
+        with self.urlopen(self.url + "/second-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Unexpected handle() call")
     
     def test_close_empty(self):
         """Test connection closure seen as empty response"""
-        with self.session.open(self.url + "/initial-request") as response:
+        with self.urlopen(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
         # Idempotent request should be retried
-        with self.session.open(self.url + "/close-if-reused") as response:
+        with self.urlopen(self.url + "/close-if-reused") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(2, self.handle_calls, "Server handle() not called")
         
         # Non-idempotent request should not be retried
         with self.assertRaises(http.client.BadStatusLine):
-            self.session.open(self.url + "/close-if-reused", b"data")
+            self.urlopen(self.url + "/close-if-reused", b"data")
         self.assertEqual(2, self.handle_calls, "Server handle() retried")
     
     def test_close_error(self):
         """Test connection closure reported as connection error"""
         self.close_connection = True
-        with self.session.open(self.url + "/initial-request") as response:
+        with self.urlopen(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
         data = b"3" * 3000000
         with self.assertRaises(http.client.BadStatusLine):
-            self.session.open(self.url + "/close-if-reused", data)
+            self.urlopen(self.url + "/close-if-reused", data)
         self.assertEqual(1, self.handle_calls, "Server handle() retried")
 
 class TestMockHttp(TestPersistentHttp):
     def setUp(self):
         super().setUp()
         entry = {"mock": self.HTTPConnection}
-        patcher = patch.dict(self.connection.conn_classes, entry)
+        patcher = patch.dict(self.handler.conn_classes, entry)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -136,27 +136,27 @@ class TestHttpSocket(TestMockHttp):
     
     def test_reuse(self):
         """Test existing connection is reused"""
-        with self.session.open("mock://localhost/one") as response:
+        with self.urlopen("mock://localhost/one") as response:
             self.assertEqual(b"First body\r\n", response.read())
-        sock = self.connection._connection.sock
+        sock = self.handler._connection.sock
         self.assertTrue(sock.reader, "Disconnected after first request")
         
-        with self.session.open("mock://localhost/two") as response:
+        with self.urlopen("mock://localhost/two") as response:
             self.assertEqual(b"Second body\r\n", response.read())
-        self.assertIs(sock, self.connection._connection.sock,
+        self.assertIs(sock, self.handler._connection.sock,
             "Socket connection changed")
         self.assertTrue(sock.reader, "Disconnected after second request")
     
     def test_new_host(self):
         """Test connecting to second host"""
-        with self.session.open("mock://localhost/one") as response:
+        with self.urlopen("mock://localhost/one") as response:
             self.assertEqual(b"First body\r\n", response.read())
-        sock1 = self.connection._connection.sock
+        sock1 = self.handler._connection.sock
         self.assertTrue(sock1.reader, "Disconnected after first request")
         
-        with self.session.open("mock://otherhost/two") as response:
+        with self.urlopen("mock://otherhost/two") as response:
             self.assertEqual(b"First body\r\n", response.read())
-        sock2 = self.connection._connection.sock
+        sock2 = self.handler._connection.sock
         self.assertIsNot(sock1, sock2, "Expected new socket connection")
         self.assertTrue(sock2.reader, "Disconnected after second request")
 
@@ -174,7 +174,7 @@ class TestHttpEstablishError(TestMockHttp):
         exception = EnvironmentError(ECONNREFUSED, "Mock connection refusal")
         self.HTTPConnection.connect_exception = exception
         try:
-            self.session.open("mock://dummy")
+            self.urlopen("mock://dummy")
         except http.client.HTTPException:
             raise
         except EnvironmentError as err:
@@ -182,4 +182,4 @@ class TestHttpEstablishError(TestMockHttp):
                 raise
         else:
             self.fail("ECONNREFUSED not raised")
-        self.assertEqual(1, self.connection._connection.connect_count)
+        self.assertEqual(1, self.handler._connection.connect_count)

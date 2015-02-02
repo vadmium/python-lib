@@ -165,19 +165,19 @@ class Server(BaseServer, Context):
 class PersistentConnectionHandler(urllib.request.BaseHandler):
     """URL handler for HTTP persistent connections
     
-    with PersistentConnectionHandler(timeout=10) as connection:
-        session = urllib.request.build_opener(connection)
+    with PersistentConnectionHandler(timeout=10) as handler:
+        opener = urllib.request.build_opener(handler)
         
         # First request opens connection
-        with session.open("http://localhost/one") as response:
+        with opener.open("http://localhost/one") as response:
             response.read()
         
         # Subsequent requests reuse existing connection, unless it got closed
-        with session.open("http://localhost/two") as response:
+        with opener.open("http://localhost/two") as response:
             response.read()
         
         # Closes old connection when new host specified
-        with session.open("http://example/three") as response:
+        with opener.open("http://example/three") as response:
             response.read()
     # Socket freed at context manager exit
     
@@ -272,12 +272,13 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
     def __exit__(self, *exc):
         self.close()
 
-def http_get(session, url, types=None, *, headers=dict(), **kw):
+def http_request(url, types=None, *,
+        urlopen=urllib.request.urlopen, headers=(), **kw):
     headers = dict(headers)
     if types is not None:
         headers["Accept"] = ", ".join(types)
     req = urllib.request.Request(url, headers=headers, **kw)
-    response = session.open(req)
+    response = urlopen(req)
     try:
         headers = response.info()
         headers.set_default_type(None)
