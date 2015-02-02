@@ -209,30 +209,34 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
             self._host = req.host
         
         headers = dict(req.header_items())
-        self._attempt_request(req, headers)
         try:
-            try:
-                response = self._connection.getresponse()
-            except EnvironmentError as err:  # Python < 3.3 compatibility
-                if err.errno not in DISCONNECTION_ERRNOS:
-                    raise
-                raise http.client.BadStatusLine(err) from err
-        except (ConnectionError, http.client.BadStatusLine):
-            idempotents = {
-                "GET", "HEAD", "PUT", "DELETE", "TRACE", "OPTIONS"}
-            if req.get_method() not in idempotents:
-                raise
-            # Retry requests whose method indicates they are idempotent
-            self._connection.close()
-            response = None
-        else:
-            if response.status == http.client.REQUEST_TIMEOUT:
-                # Server indicated it did not handle request
-                response = None
-        if not response:
-            # Retry request
             self._attempt_request(req, headers)
-            response = self._connection.getresponse()
+            try:
+                try:
+                    response = self._connection.getresponse()
+                except EnvironmentError as err:  # Python < 3.3 compatibility
+                    if err.errno not in DISCONNECTION_ERRNOS:
+                        raise
+                    raise http.client.BadStatusLine(err) from err
+            except (ConnectionError, http.client.BadStatusLine):
+                idempotents = {
+                    "GET", "HEAD", "PUT", "DELETE", "TRACE", "OPTIONS"}
+                if req.get_method() not in idempotents:
+                    raise
+                # Retry requests whose method indicates they are idempotent
+                self._connection.close()
+                response = None
+            else:
+                if response.status == http.client.REQUEST_TIMEOUT:
+                    # Server indicated it did not handle request
+                    response = None
+            if not response:
+                # Retry request
+                self._attempt_request(req, headers)
+                response = self._connection.getresponse()
+        except:
+            self._connection.close()
+            raise
         
         # Odd impedance mismatch between "http.client" and "urllib.request"
         response.msg = response.reason
