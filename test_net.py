@@ -23,30 +23,30 @@ class TestLoopbackHttp(TestPersistentHttp):
         class RequestHandler(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
             
-            self.close_connection = False
-            
             def do_GET(handler):
+                if handler.path == "/close-if-reused" and handler.reused:
+                    handler.close_connection = True
+                    return
                 handler.send_response(200)
                 handler.send_header("Content-Length", format(6))
                 handler.end_headers()
                 handler.wfile.write(b"body\r\n")
-                handler.close_connection = self.close_connection
+                handler.reused = True
             
             def do_POST(handler):
+                if handler.path == "/close-if-reused" and handler.reused:
+                    handler.close_connection = True
+                    return
                 length = int(handler.headers["Content-Length"])
                 while length > 0:
                     length -= len(handler.rfile.read(min(length, 0x10000)))
-                
-                handler.send_response(200)
-                handler.send_header("Content-Length", format(6))
-                handler.end_headers()
-                handler.wfile.write(b"body\r\n")
-                handler.close_connection = self.close_connection
+                handler.do_GET()
             
             self.handle_calls = 0
-            def handle(*pos, **kw):
+            def handle(handler, *pos, **kw):
                 self.handle_calls += 1
-                return BaseHTTPRequestHandler.handle(*pos, **kw)
+                handler.reused = False
+                return BaseHTTPRequestHandler.handle(handler, *pos, **kw)
         
         server = HTTPServer(("localhost", 0), RequestHandler)
         self.addCleanup(server.server_close)
@@ -59,48 +59,41 @@ class TestLoopbackHttp(TestPersistentHttp):
 
     def test_reuse(self):
         """Test existing connection is reused"""
-        with self.session.open(self.url + "/one") as response:
+        with self.session.open(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
-        with self.session.open(self.url + "/two") as response:
+        with self.session.open(self.url + "/second-request") as response:
             self.assertEqual(b"body\r\n", response.read())
         self.assertEqual(1, self.handle_calls, "Unexpected handle() call")
     
     def test_close_empty(self):
         """Test connection closure seen as empty response"""
-        self.close_connection = True
-        
-        with self.session.open(self.url + "/one") as response:
+        with self.session.open(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
-        self.assertEqual(1, self.handle_calls,
-            "Server handle() not called for /one")
+        self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
         # Idempotent request should be retried
-        with self.session.open(self.url + "/two") as response:
+        with self.session.open(self.url + "/close-if-reused") as response:
             self.assertEqual(b"body\r\n", response.read())
-        self.assertEqual(2, self.handle_calls,
-            "Server handle() not called for /two")
+        self.assertEqual(2, self.handle_calls, "Server handle() not called")
         
         # Non-idempotent request should not be retried
         with self.assertRaises(http.client.BadStatusLine):
-            self.session.open(self.url + "/post", b"data")
-        self.assertEqual(2, self.handle_calls,
-            "Server handle() retried for POST")
+            self.session.open(self.url + "/close-if-reused", b"data")
+        self.assertEqual(2, self.handle_calls, "Server handle() retried")
     
     def test_close_error(self):
         """Test connection closure reported as connection error"""
         self.close_connection = True
-        with self.session.open(self.url + "/one") as response:
+        with self.session.open(self.url + "/initial-request") as response:
             self.assertEqual(b"body\r\n", response.read())
-        self.assertEqual(1, self.handle_calls,
-            "Server handle() not called for /one")
+        self.assertEqual(1, self.handle_calls, "Server handle() not called")
         
         data = b"3" * 3000000
         with self.assertRaises(http.client.BadStatusLine):
-            self.session.open(self.url + "/two", data)
-        self.assertEqual(1, self.handle_calls,
-            "Server handle() retried for POST")
+            self.session.open(self.url + "/close-if-reused", data)
+        self.assertEqual(1, self.handle_calls, "Server handle() retried")
 
 class TestMockHttp(TestPersistentHttp):
     def setUp(self):
@@ -110,6 +103,10 @@ class TestMockHttp(TestPersistentHttp):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+def select_timeout(*pos, **kw):
+    return ([], [], [])
+
+@patch("net.select", select_timeout)
 class TestHttpSocket(TestMockHttp):
     class HTTPConnection(http.client.HTTPConnection):
         def connect(self):
@@ -129,6 +126,7 @@ class TestHttpSocket(TestMockHttp):
         def __init__(self, data):
             self.reader = BufferedReader(BytesIO(data))
             self.reader.close = lambda: None  # Avoid Python Issue 23377
+            self.reader.fileno = lambda: None
         def sendall(self, *pos, **kw):
             pass
         def close(self, *pos, **kw):
