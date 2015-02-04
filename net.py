@@ -6,14 +6,14 @@ from ssl import SSLError
 from misc import Context
 import urllib.request
 import http.client
-from errno import EPIPE, ESHUTDOWN, ENOTCONN, ECONNRESET
+from errno import EPIPE, ENOTCONN, ECONNRESET
 
 try:  # Python 3.3
     ConnectionError
 except NameError:  # Python < 3.3
     ConnectionError = ()
 
-DISCONNECTION_ERRNOS = {EPIPE, ESHUTDOWN, ENOTCONN, ECONNRESET}
+DISCONNECTION_ERRNOS = {EPIPE, ENOTCONN, ECONNRESET}
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
