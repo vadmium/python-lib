@@ -51,9 +51,9 @@ scheme=None, netloc=None, path=None, params=None, query=None, fragment=None):
     return urllib.parse.urlunparse(res)
 
 def format_addr(address):
-    (address, port) = address
+    [address, port] = address
     if not frozenset("[]:").isdisjoint(address):
-        addrss = "[{}]".format(address)
+        address = "[{}]".format(address)
     if port is not None:
         address = "{}:{}".format(address, port)
     return address
