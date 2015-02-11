@@ -8,6 +8,19 @@ import urllib.request
 import http.client
 from unittest.mock import patch
 
+class Test(TestCase):
+    def test_format_addr(self):
+        tests = (
+            ("::1", 80, "[::1]:80"),
+            ("::1", None, "[::1]"),
+            ("localhost", 0, "localhost:0"),
+            ("localhost", None, "localhost"),
+        )
+        for [host, port, output] in tests:
+            input = (host, port)
+            with self.subTest(input):
+                self.assertEqual(output, net.format_addr(input))
+
 class TestPersistentHttp(TestCase):
     def setUp(self):
         TestCase.setUp(self)
