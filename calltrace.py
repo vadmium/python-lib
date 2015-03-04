@@ -14,6 +14,7 @@ from types import (
     ModuleType, GeneratorType, InstanceType, ClassType,
 )
 import reprlib
+import time
 
 class traced(WrapperFunction):
     def __init__(self, func, abbrev=set()):
@@ -23,10 +24,12 @@ class traced(WrapperFunction):
     def __call__(self, *args, **kw):
         start()
         print_call(custrepr(self.__wrapped__), args, kw, self.abbrev)
+        start_time = time.monotonic()
         with trace_exc(abbrev=self.abbrev):
             ret = self.__wrapped__(*args, **kw)
+        period = _format_si(time.monotonic() - start_time, 3)
         result()
-        line("->", optrepr(ret, "return" in self.abbrev))
+        line("-> {} after {}s", optrepr(ret, "return" in self.abbrev), period)
         return ret
     
     def __repr__(self):
@@ -40,16 +43,18 @@ class tracer(Function):
     def __call__(self, *pos, **kw):
         start()
         print_call(self.__name__, pos, kw, abbrev=self.abbrev)
-        line()
+        line("")
 
 @contextmanager
 def checkpoint(text, abbrev=()):
     start()
     stderr.write(text)
+    start_time = time.monotonic()
     with trace_exc(abbrev=abbrev):
         yield
+    period = time.monotonic() - start_time
     result()
-    line("done")
+    line("{}s", _format_si(period, 3), period)
 
 @contextmanager
 def trace_exc(abbrev=()):
@@ -57,11 +62,13 @@ def trace_exc(abbrev=()):
     
     stderr.flush()
     indent += 1
+    start = time.monotonic()
     try:
         yield
     except BaseException as exc:
+        period = _format_si(time.monotonic() - start, 3)
         result()
-        line("raise", optrepr(exc, "raise" in abbrev))
+        line("raise {} after {}s", optrepr(exc, "raise" in abbrev), period)
         raise
 
 def result():
@@ -209,12 +216,12 @@ midline = False
 
 def start():
     if midline:
-        line()
+        line("")
     margin()
 
-def line(*pos, **kw):
+def line(format_string, *pos, **kw):
     global midline
-    print(*pos, file=stderr, **kw)
+    print(format_string.format(*pos, **kw), file=stderr)
     midline = False
 
 def margin():
@@ -222,3 +229,36 @@ def margin():
     for _ in range(indent):
         stderr.write("  ")
     midline = True
+
+def _format_si(number, ndigits):
+    '''
+    format_si(0, 3) -> "0.00 "  # Only leading zero; significant digits
+    format_si(10150, 3) -> "10.2 k"  # Round half up to even
+    format_si(222500, 3) -> "222 k"  # Half down to even; no decimal point
+    format_si(0.99949, 3) -> "999 m"  # Prefer more accurate rounding
+    format_si(1.380648813e-23, 3) -> "1.38e-23 "  # Extreme value
+    '''
+    scientific = "{:.{}e}".format(number, ndigits - 1)
+    [significand, exponent] = scientific.rsplit("e", 2)
+    [prefix, scaled_exp] = divmod(int(exponent), 3)
+    significand = significand.replace(".", "", 1)
+    if significand.startswith("-"):
+        digits_start = 1
+    else:
+        digits_start = 0
+    dec_pos = digits_start + 1 + scaled_exp
+    fraction = significand[dec_pos:]
+    if fraction:
+        fraction = "." + fraction
+    if prefix:
+        if prefix < 0:
+            prefixes = "mµnpfazy"
+            prefix = -prefix
+        else:
+            prefixes = "kMGTPEZY"
+        if prefix > len(prefixes):
+            return scientific + " "
+        prefix = prefixes[prefix - 1]
+    else:
+        prefix = ""
+    return "{}{} {}".format(significand[:dec_pos], fraction, prefix)
