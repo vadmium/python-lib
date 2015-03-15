@@ -15,6 +15,7 @@ from types import (
 )
 import reprlib
 import time
+import operator
 
 class traced(WrapperFunction):
     def __init__(self, func, abbrev=set()):
@@ -208,6 +209,14 @@ class Repr(reprlib.Repr):
     def generator(self, gen):
         return "<{} 0x{:X}>".format(self.named(gen), id(gen))
     classes[GeneratorType] = generator
+    
+    def memory(self, view):
+        nbytes = getattr(view, "nbytes", None)
+        if nbytes is None:  # Python < 3
+            nbytes = reduce(operator.mul, view.shape, 1) * view.itemsize
+        access = "readonly" if view.readonly else "writable"
+        return "<memory 0x{:X} {} len={}>".format(id(view), access, nbytes)
+    classes[memoryview] = memory
     
     subclasses = OrderedSubclasses(classes.keys())
 
