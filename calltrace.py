@@ -33,8 +33,8 @@ class traced(WrapperFunction):
         return ret
     
     def __repr__(self):
-        return "{0.__class__.__name__}({1})".format(
-            self, custrepr(self.__wrapped__))
+        return "{}({})".format(
+            self.__class__.__name__, custrepr(self.__wrapped__))
 
 class tracer(Function):
     def __init__(self, name, abbrev=()):
@@ -91,7 +91,7 @@ def print_call(func, pos=(), kw=dict(), abbrev=()):
     for (k, v) in kw.items():
         if comma:
             stderr.write(", ")
-        stderr.write("{0}={1}".format(k, optrepr(v, k in abbrev)))
+        stderr.write("{}={}".format(k, optrepr(v, k in abbrev)))
         comma = True
     
     stderr.write(")")
@@ -121,8 +121,8 @@ class OrderedSubclasses(dict):
             if subclass == cls or not issubclass(subclass, cls):
                 continue
             if subclass in self.superclasses:
-                raise ValueError("{0!r} is both a subclass and a superclass "
-                    "of {1!r}".format(subclass, cls))
+                raise ValueError("{!r} is both a subclass and a superclass "
+                    "of {!r}".format(subclass, cls))
             existing = set(subclasses)
             for subclass in self[subclass]:
                 if subclass not in existing:
@@ -171,7 +171,7 @@ class Repr(reprlib.Repr):
     
     def obj(self, obj):
         """Mimic object representation printed by the garbage collector"""
-        return "<{0} 0x{1:X}>".format(self.recurse(obj.__class__), id(obj))
+        return "<{} 0x{:X}>".format(self.recurse(obj.__class__), id(obj))
     classes[object] = obj
     
     def named(self, obj):
@@ -179,7 +179,7 @@ class Repr(reprlib.Repr):
         if False:
             module = getattr(obj, "__module__", None)
             if module is not None:
-                name = "{0}.{1}".format(module, name)
+                name = "{}.{}".format(module, name)
         return name
     classes[FunctionType] = named
     classes[type] = named
@@ -188,8 +188,8 @@ class Repr(reprlib.Repr):
     def method(self, method):
         binding = method.__self__ or getattr(method, "im_class", None)
         if binding:
-            return "{0}.{1.__func__.__name__}".format(
-                self.recurse(binding), method)
+            return "{}.{}".format(
+                self.recurse(binding), method.__func__.__name__)
         else:
             return self.recurse(method.__func__)
     classes[MethodType] = method
@@ -199,14 +199,14 @@ class Repr(reprlib.Repr):
         # Built-in functions tend to set __self__ to their module
         if binding and (not isinstance(binding, ModuleType) or
         binding.__name__ != builtin.__module__):
-            return "{0}.{1.__name__}".format(self.recurse(binding), builtin)
+            return "{}.{}".format(self.recurse(binding), builtin.__name__)
         else:
             return self.named(builtin)
     classes[BuiltinFunctionType] = builtin
     classes[BuiltinMethodType] = builtin
     
     def generator(self, gen):
-        return "<{0} 0x{1:X}>".format(self.named(gen), id(gen))
+        return "<{} 0x{:X}>".format(self.named(gen), id(gen))
     classes[GeneratorType] = generator
     
     subclasses = OrderedSubclasses(classes.keys())
