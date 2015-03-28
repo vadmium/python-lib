@@ -24,17 +24,18 @@ class HTTPConnection:
             else:
                 yield from self.sock.sendall(bytes((c,)))
         
-        yield from self.sock.sendall(b" HTTP/1.1\r\n"
-            
-            # Mandatory for 1.1:
-            b"Host: "
-        )
-        yield from self.sock.sendall(hostname.encode())
-        # User-Agent: python-event-http
+        yield from self.sock.sendall(b" HTTP/1.1\r\n")
+        
+        yield from self.putheader("Host", hostname)  # Mandatory for 1.1
+        yield from self.putheader("User-Agent", "coroutines.http (Vadmium)")
         # X-Forwarded-For: . . .
-        yield from self.sock.sendall(b"\r\n"
-            b"\r\n"
-        )
+        yield from self.sock.sendall(b"\r\n")
+    
+    def putheader(self, name, value):
+        yield from self.sock.sendall(name.encode("ascii"))
+        yield from self.sock.sendall(b": ")
+        yield from self.sock.sendall(value.encode("ascii"))
+        yield from self.sock.sendall(b"\r\n")
     
     def getresponse(self):
         parser = Parser(self.sock)
