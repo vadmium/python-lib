@@ -50,8 +50,8 @@ class HTTPConnection:
                 pre_space = yield from parser.space()
             except ExcessError as e:
                 raise BadStatusLine(e.data)
-            if parser.eol:
-                raise BadStatusLine(pre_space + parser.eol + parser.c)
+            if parser.c == b"\n":
+                raise BadStatusLine(pre_space + parser.c)
             
             pattern = b"HTTP/"
             for (i, p) in enumerate(pattern):
@@ -94,9 +94,9 @@ class HTTPConnection:
                 raise BadStatusLine(pre_space + pattern + major + b"." +
                     minor + mid_space + e.data)
             mid_space.extend(space)
-            if parser.eol:
+            if parser.c == b"\n":
                 raise BadStatusLine(pre_space + pattern + major + b"." +
-                    minor + mid_space + parser.eol + parser.c)
+                    minor + mid_space + parser.c)
             
             status = bytearray()
             for i in range(3):
@@ -114,16 +114,12 @@ class HTTPConnection:
         yield from parser.space()
         
         reason = bytearray()
-        for i in range(400):
-            if i:
-                yield from parser.next_char()
-                yield from parser.after_eol()
-            if parser.eol is not None:
-                if not parser.at_lws():
-                    break
-                else:
-                    reason.extend(parser.eol)
-            reason.extend(parser.c)
+        for _ in range(400):
+            current = parser.c
+            reason.extend(current)
+            yield from parser.next_char()
+            if current in b"\n" and not parser.at_lws():  # Including EOF
+                break
         else:
             raise ExcessError("Status reason of 400 or more characters")
         reason = reason.rstrip()
@@ -133,15 +129,13 @@ class HTTPConnection:
         encodings = net.header_list(msg, "Transfer-Encoding")
         encoding = next(encodings, None)
         if not encoding:
-            yield from parser.after_eol()
-            
             lengths = net.header_list(msg, "Content-Length")
             length = next(lengths, None)
             if length is None:
-                return _EofResponse(status, reason, msg, self.sock, parser)
+                return _EofResponse(status, reason, msg, self.sock)
             else:
                 return _LengthResponse(status, reason, msg,
-                    self.sock, parser, length, lengths)
+                    self.sock, length, lengths)
         
         # TODO: check for "identity"
         encodings = next(encodings, None)
@@ -149,7 +143,7 @@ class HTTPConnection:
             raise UnknownTransferEncoding("Not chunked transfer encoding")
         del msg["Transfer-Encoding"]
         
-        return _ChunkedResponse(status, reason, msg, self.sock, parser)
+        return _ChunkedResponse(status, reason, msg, self.sock)
 
 class HTTPResponse:
     def __init__(self, status, reason, msg):
@@ -158,96 +152,78 @@ class HTTPResponse:
         self.msg = msg
 
 class _EofResponse(HTTPResponse):
-    def __init__(self, status, reason, msg, sock, parser):
+    def __init__(self, status, reason, msg, sock):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        self.data = parser.c
     
     def read(self, amt):
-        if self.data is None:
-            data = yield from self.sock.recv(amt)
-        else:
-            data = self.data
-            self.data = None
-        return data
+        return self.sock.recv(amt)
 
 class _LengthResponse(HTTPResponse):
-    def __init__(self, status, reason, msg, sock, parser, length, lengths):
+    def __init__(self, status, reason, msg, sock, length, lengths):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
         self.size = int(length)
         for dupe in lengths:
             if int(dupe) != self.size:
                 raise HTTPException("Conflicting Content-Length values")
-        if self.size:
-            self.data = parser.c
-        else:
-            self.data = None
     
     def read(self, amt):
-        if self.data is None:
-            data = yield from self.sock.recv(min(self.size, amt))
-        else:
-            data = self.data
-            self.data = None
+        data = yield from self.sock.recv(min(self.size, amt))
         self.size -= len(data)
         return data
 
 class _ChunkedResponse(HTTPResponse):
-    def __init__(self, status, reason, msg, sock, parser):
+    def __init__(self, status, reason, msg, sock):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
         self.chunk_gen = AsyncioGenerator()
-        self.chunks = self.Chunks(parser)
+        self.chunks = self.Chunks()
         self.size = None
     
     def read(self, amt):
-        if self.size:
-            data = yield from self.sock.recv(min(self.size, amt))
-        else:
-            (self.size, data) = yield from self.chunk_gen.next(self.chunks)
+        if not self.size:
+            self.size = yield from self.chunk_gen.next(self.chunks)
+        data = yield from self.sock.recv(min(self.size, amt))
         self.size -= len(data)
         return data
     
-    def Chunks(self, parser):
+    def Chunks(self):
         """
-        Generator that returns chunk length and the first byte of each chunk
-        
-        Entry with parser.c = Start of EOL following headers
+        Generator that returns chunk length
         """
         
         for _ in range(30000):
-            yield from parser.after_eol()
+            yield from parser.next_char()
+            if parser.c == b"\r":
+                yield from parser.next_char()
+            if parser.c == b"\n":
+                yield from parser.next_char()
             yield from parser.space()
             
             size = 0
-            if parser.eol is None:
-                for _ in range(30):
-                    try:
-                        digit = int(parser.c, 16)
-                    except ValueError:
-                        break
-                    size = size * 16 + digit
-                    yield from parser.next_char()
-                else:
-                    raise ExcessError("Chunk size of 30 or more digits")
-                yield from parser.after_eol()
+            for _ in range(30):
+                try:
+                    digit = int(parser.c, 16)
+                except ValueError:
+                    break
+                size = size * 16 + digit
+                yield from parser.next_char()
+            else:
+                raise ExcessError("Chunk size of 30 or more digits")
             
             i = 0
-            while parser.eol is None:
+            while parser.c not in b"\n":  # Including EOF
                 i += 1
                 if i >= 3000:
                     raise ExcessError("Line of 3000 or more characters")
                 yield from self.next_char()
-                yield from self.after_eol()
             
             if not size:
-                yield from self.chunk_gen.generate((0, b""))
+                yield from self.chunk_gen.generate(0)
                 break
             
-            yield from self.chunk_gen.generate((size, parser.c))
-            
-            yield from parser.next_char()
+            yield from self.chunk_gen.generate(size)
         else:
             raise ExcessError("30000 or more chunks")
         
@@ -256,7 +232,6 @@ class _ChunkedResponse(HTTPResponse):
 class Parser:
     """
     "c" may hold last read character; empty string at EOF
-    "eol" may ...
     """
     
     def __init__(self, sock):
@@ -269,23 +244,26 @@ class Parser:
     def headers(self):
         """
         Entry with self.c = first character of headers
-        Leaves with self.c = start of EOL which terminated the headers
+        Leaves with self.c not set
         """
         
         parser = email.parser.FeedParser()
         
-        self.eol = b""
+        blank_line = True
         for _ in range(30000):
-            if self.eol is not None:
-                if self.at_eol():
-                    return parser.close()
-                else:
-                    parser.feed(self.eol.decode("latin-1"))
+            if not self.c:
+                break
             parser.feed(self.c.decode("latin-1"))
+            if self.c == b"\n":
+                if blank_line:
+                    break
+                blank_line = True
+            elif self.c != b"\r":
+                blank_line = False
             yield from self.next_char()
-            yield from self.after_eol()
         else:
             raise ExcessError("30000 or more headers")
+        return parser.close()
     
     def space(self):
         """Read and skip over spaces
@@ -297,46 +275,11 @@ class Parser:
         for i in range(self.SPACE_LIMIT):
             if i:
                 yield from self.next_char()
-            yield from self.after_eol()
             if not self.at_lws():
                 return bytes(space)
-            
-            if self.eol:
-                space.extend(self.eol)
             space.extend(self.c)
         else:
             raise ExcessError("Excessive space", bytes(space))
-
-    def after_eol(self):
-        """Parses potential end of line and reads the next character
-        
-        Sets self.eol = EOL character sequence, if "self.c" was at EOL, or
-            "None"
-        Returns with self.c = next character, following EOL if found
-        
-        eol, c -> (c, eol)
-        eol, EOF -> ("", eol)
-        EOF -> ("", "")
-        c != eol -> (c, None)
-        
-        Check for EOF: c == ""
-        Check for EOL incl EOF: eol is not None
-        True EOL: bool(eol)
-        Check for LWS: c.isspace()
-        """
-        
-        if not self.at_eol():
-            self.eol = None
-            return
-        
-        self.eol = self.c
-        yield from self.next_char()
-        if self.eol == b"\r" and self.c == b"\n":
-            self.eol = CRLF
-            yield from self.next_char()
-    
-    def at_eol(self):
-        return not self.c or self.c in CRLF
     
     def at_lws(self):
         return self.c.isspace() and self.c not in CRLF
