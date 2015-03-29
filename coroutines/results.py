@@ -94,6 +94,12 @@ def exit_generator(self):
         return sys.excepthook(*self.triple())
     def __repr__(self):
         return "{}({!r})".format(type(self).__name__, self.exception())
+    
+    def generator_result(self):
+        if isinstance(self.exception(), StopIteration):
+            return ReturnResult(*self.exception().args)
+        else:
+            return self
 
 def call_result(call, *pos, **kw):
     exception = kw.pop("exception", BaseException)
