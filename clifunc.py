@@ -113,8 +113,7 @@ def run(func=None, args=None, param_types=dict(), cli_result=False):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
-    args: Defaults to sys.argv[1:]. If specified, the command name shown in
-        help is taken from func.__name__; otherwise, from sys.argv[0].
+    args: Defaults to sys.argv[1:]
     param_types:  This mapping extends and overrides any "param_types"
         attribute of "func". The parameter and attribute both map parameter
         keywords to functions taking an argument string and returning the
@@ -154,21 +153,28 @@ def run(func=None, args=None, param_types=dict(), cli_result=False):
         with much "argparse" API and little automatic introspection
     """
     
-    (func, sig, keywords, param_types) = prepare(func, param_types)
+    [func, sig, keywords, param_types] = prepare(func, param_types)
     varpos = param_kind(sig, Parameter.VAR_POSITIONAL)
     varkw = param_kind(sig, Parameter.VAR_KEYWORD)
     
     if args is None:
         args = sys.argv[1:]
     
-    auto_help = varkw is None and "help" not in keywords
-    if auto_help:
-        param = Parameter("help", Parameter.KEYWORD_ONLY, default=False)
-        keywords[param.name] = param
+    auto_help = list()
+    if varkw is None:
+        for opt in ("help", "h"):
+            if opt not in keywords:
+                auto_help.append(opt)
+                param = Parameter(opt, Parameter.KEYWORD_ONLY, default=False)
+                keywords[opt] = param
     
-    pos_kinds = (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
-    pos_iter = (param for
-        param in sig.parameters.values() if param.kind in pos_kinds)
+    if sig:
+        pos_kinds = (
+            Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+        pos_iter = (param for
+            param in sig.parameters.values() if param.kind in pos_kinds)
+    else:
+        pos_iter = iter(())
     
     positional = list()
     opts = dict()
@@ -191,7 +197,7 @@ def run(func=None, args=None, param_types=dict(), cli_result=False):
             
             # Allow argument to be separated by equals sign
             try:
-                (opt, arg) = opt.split("=")
+                [opt, arg] = opt.split("=")
             except ValueError:
                 arg = None
             
@@ -214,8 +220,12 @@ def run(func=None, args=None, param_types=dict(), cli_result=False):
                     try:
                         arg = next(args)
                     except StopIteration:
-                        raise SystemExit("Option {opt!r} requires an "
-                            "argument".format(**locals()))
+                        if sig:
+                            msg = "Option {!r} requires an argument"
+                            msg = msg.format(opt)
+                        else:
+                            msg = "Keyword options require arguments"
+                        raise SystemExit(msg)
                 
                 arg = convert(param_types, param, arg)
                 
@@ -233,14 +243,15 @@ def run(func=None, args=None, param_types=dict(), cli_result=False):
                 arg = convert(param_types, param, arg)
             positional.append(arg)
     
-    if auto_help and opts.get("help", False):
+    if any(opts.get(help, False) for help in auto_help):
         help(func, param_types=param_types)
         return
     
-    try:
-        sig.bind(*positional, **opts)
-    except TypeError as err:
-        raise SystemExit(err)
+    if sig:
+        try:
+            sig.bind(*positional, **opts)
+        except TypeError as err:
+            raise SystemExit(err)
     
     result = func(*positional, **opts)
     with ExitStack() as cleanup:
@@ -294,15 +305,19 @@ def convert(types, param, arg):
 
 @public
 def help(func=None, file=sys.stderr, param_types=dict()):
-    (func, sig, keywords, param_types) = prepare(func, param_types)
+    [func, sig, keywords, param_types] = prepare(func, param_types)
     
-    (summary, body) = splitdoc(inspect.getdoc(func))
+    [summary, body] = splitdoc(inspect.getdoc(func))
     if summary:
-        print(summary, file=file)
+        file.writelines((summary, "\n"))
     
-    if sig.parameters:
+    if not sig:
         if summary:
-            print(file=file)
+            file.write("\n")
+        file.write("syntax: [-keyword=argument . . .] [positional . . .]\n")
+    elif sig.parameters:
+        if summary:
+            file.write("\n")
         file.write("parameters:")
         
         for param in sig.parameters.values():
@@ -321,15 +336,15 @@ def help(func=None, file=sys.stderr, param_types=dict()):
                 first = False
             file.write(" {}={!s}".format(option(param.name), param.default))
         
-        print(file=file)
+        file.write("\n")
     
     if body is not None:
-        if summary or sig.parameters:
-            print(file=file)
-        print(body, file=file)
+        if summary or not sig or sig.parameters:
+            file.write("\n")
+        file.writelines((body, "\n"))
     
-    if not summary and not sig.parameters and not body:
-        print("no parameters", file=file)
+    if not summary and sig and not sig.parameters and not body:
+        file.write("no parameters\n")
 
 def splitdoc(doc):
     """Returns a tuple (summary, body) for a docstring
@@ -404,14 +419,17 @@ def option(param):
 def prepare(func=None, param_types=dict()):
     if func is None:
         from __main__ import main as func
+    param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
     
-    sig = signature(func)
+    try:
+        sig = signature(func)
+    except (ValueError, TypeError):
+        return (func, None, dict(), param_types)
     
     keyword_kinds = (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY)
     keywords = OrderedDict((param.name, param) for
         param in sig.parameters.values() if param.kind in keyword_kinds)
     
-    param_types = ChainMap(param_types, getattr(func, "param_types", dict()))
     # Explicit set() construction to work around Python 2's keys() lists
     missing = set(param_types.keys()).difference(sig.parameters.keys())
     if missing:
@@ -422,8 +440,15 @@ def prepare(func=None, param_types=dict()):
     return (func, sig, keywords, param_types)
 
 def param_kind(sig, kind):
-    return next(iter(param for
-        param in sig.parameters.values() if param.kind == kind), None)
+    if sig:
+        return next(iter(param for
+            param in sig.parameters.values() if param.kind == kind), None)
+    else:
+        name = {
+            Parameter.VAR_POSITIONAL: "positional",
+            Parameter.VAR_KEYWORD: "keywords",
+        }[kind]
+        return Parameter(name, kind, default=Parameter.empty)
 
 # Infer parameter modes from default values
 def noarg_param(param):
