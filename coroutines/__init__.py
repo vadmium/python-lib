@@ -36,7 +36,8 @@ class EventLoop(BaseEventLoop):
         queue.append(partial(callback, *pos, **kw))
         if queue is new:
             self.new_callbacks()
-    call_soon_threadsafe = call_soon
+    def call_soon_threadsafe(self, *pos, **kw):
+        return self.call_soon(*pos, **kw)
     
     def invoke_callbacks(self):
         callbacks = self.callbacks.pop(None)
