@@ -37,9 +37,14 @@ class Socket(Context):
     
     def sendall(self, data, *args, **kw):
         while data:
-            data = data[self.sock.send(data, *args, **kw):]
-        if False:
-            yield
+            try:
+                data = data[self.sock.send(data, *args, **kw):]
+                break
+            except SSLWantReadError:
+                future = Future(loop=self.loop)
+                self.loop.add_reader(self.sock.fileno(), future.set_result,
+                    None)
+                yield from future
     
     def close(self, *args, **kw):
         self.sock.close(*args, **kw)
