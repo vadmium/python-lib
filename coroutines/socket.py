@@ -50,9 +50,9 @@ class Socket(Context):
         self.sock.close(*args, **kw)
 
 class Ssl(Socket):
-    def __init__(self, socket):
+    def __init__(self, context, socket):
         self.loop = socket.loop
-        self.sock = ssl.wrap_socket(socket.sock,
+        self.sock = context.wrap_socket(socket.sock,
             do_handshake_on_connect=False)
     
     def handshake(self, *args, **kw):
