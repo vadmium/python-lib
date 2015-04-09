@@ -412,8 +412,11 @@ If the function name is omitted, the main() function is called.""")
         else:
             func = None
         if func is None:
-            func = importlib.import_module(name)
+            module = name
+            func = importlib.import_module(module)
     except ImportError as err:
+        if getattr(err, "name", module) != module:  # Python 3.3
+            raise
         raise SystemExit(err)
     
     if isinstance(func, ModuleType):
