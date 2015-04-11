@@ -427,4 +427,7 @@ If the function name is omitted, the main() function is called.""")
     return run(func, sys.argv[2:])
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (KeyboardInterrupt, BrokenPipeError):
+        raise SystemExit(1)
