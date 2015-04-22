@@ -218,7 +218,7 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
                 self._attempt_request(req, headers)
                 response = self._connection.getresponse()
         except:
-            self._connection.close()
+            self._connection.close()  # Allow caller to make more requests
             raise
         
         # Odd impedance mismatch between "http.client" and "urllib.request"
