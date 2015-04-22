@@ -8,6 +8,8 @@ import urllib.request
 import http.client
 from errno import EPIPE, ENOTCONN, ECONNRESET
 from select import select
+from contextlib import contextmanager
+from streams import DelegateWriter
 
 try:  # Python 3.3
     ConnectionError
@@ -201,6 +203,38 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
         if req.type not in self.conn_classes:
             return None
         
+        with self._setup_request(req):
+            headers = dict(req.header_items())
+            # On a fresh connection, only attempt request once
+            response = self._reuse_connection(req, headers)
+            if not response:
+                # (Re)try request on a fresh connection
+                self._attempt_request(req, headers)
+                response = self._connection.getresponse()
+        
+        # Odd impedance mismatch between "http.client" and "urllib.request"
+        response.msg = response.reason
+        return response
+    
+    def start_request(self, request):
+        with self._setup_request(request):
+            self._check_reusable()
+            self._connection.putrequest(
+                request.get_method(), request.selector)
+            for item in request.header_items():
+                self._connection.putheader(*item)
+            self._connection.endheaders()
+    
+    def get_writer(self):
+        return DelegateWriter(self._connection.send)
+    
+    def get_response(self):
+        response = self._connection.getresponse()
+        response.msg.set_default_type(None)
+        return response
+    
+    @contextmanager
+    def _setup_request(self, req):
         if req.type != self._type or req.host != self._host:
             if self._connection:
                 self._connection.close()
@@ -209,28 +243,23 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
             self._type = req.type
             self._host = req.host
         
-        headers = dict(req.header_items())
         try:
-            # On a fresh connection, only attempt request once
-            response = self._reuse_connection(req, headers)
-            if not response:
-                # (Re)try request on a fresh connection
-                self._attempt_request(req, headers)
-                response = self._connection.getresponse()
+            yield
         except:
             self._connection.close()  # Allow caller to make more requests
             raise
-        
-        # Odd impedance mismatch between "http.client" and "urllib.request"
-        response.msg = response.reason
-        return response
     
-    def _reuse_connection(self, req, headers):
+    def _check_reusable(self):
         if self._connection.sock is None:
-            return None
+            return False
         if any(select((self._connection.sock,), (), (), 0)):
             # Assume EOF or 408 Request Timeout has been signalled
             self._connection.close()
+            return False
+        return True
+    
+    def _reuse_connection(self, req, headers):
+        if not self._check_reusable():
             return None
         # Attempt request on existing connection
         self._attempt_request(req, headers)
