@@ -210,34 +210,9 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
             self._host = req.host
         
         headers = dict(req.header_items())
-        response = None
         try:
-            if self._connection.sock is None:
-                pass  # On a fresh connection, only attempt request once
-            elif any(select((self._connection.sock,), (), (), 0)):
-                # Assume EOF or 408 Request Timeout has been signalled
-                self._connection.close()
-            else:
-                # Attempt request on existing connection
-                self._attempt_request(req, headers)
-                try:
-                    try:
-                        response = self._connection.getresponse()
-                    except EnvironmentError as err:  # Python < 3.3 compat.
-                        if err.errno not in DISCONNECTION_ERRNOS:
-                            raise
-                        raise http.client.BadStatusLine(err) from err
-                except (ConnectionError, http.client.BadStatusLine):
-                    idempotents = {
-                        "GET", "HEAD", "PUT", "DELETE", "TRACE", "OPTIONS"}
-                    if req.get_method() not in idempotents:
-                        raise
-                    # Retry requests whose method indicates idempotence
-                    self._connection.close()
-                else:
-                    if response.status == http.client.REQUEST_TIMEOUT:
-                        # Server indicated it did not handle request
-                        response = None
+            # On a fresh connection, only attempt request once
+            response = self._reuse_connection(req, headers)
             if not response:
                 # (Re)try request on a fresh connection
                 self._attempt_request(req, headers)
@@ -248,6 +223,34 @@ class PersistentConnectionHandler(urllib.request.BaseHandler):
         
         # Odd impedance mismatch between "http.client" and "urllib.request"
         response.msg = response.reason
+        return response
+    
+    def _reuse_connection(self, req, headers):
+        if self._connection.sock is None:
+            return None
+        if any(select((self._connection.sock,), (), (), 0)):
+            # Assume EOF or 408 Request Timeout has been signalled
+            self._connection.close()
+            return None
+        # Attempt request on existing connection
+        self._attempt_request(req, headers)
+        try:
+            try:
+                response = self._connection.getresponse()
+            except EnvironmentError as err:  # Python < 3.3 compat.
+                if err.errno not in DISCONNECTION_ERRNOS:
+                    raise
+                raise http.client.BadStatusLine(err) from err
+        except (ConnectionError, http.client.BadStatusLine):
+            idempotents = {
+                "GET", "HEAD", "PUT", "DELETE", "TRACE", "OPTIONS"}
+            if req.get_method() not in idempotents:
+                raise
+            self._connection.close()
+            return None  # Retry requests whose method indicates idempotence
+        if response.status == http.client.REQUEST_TIMEOUT:
+            # Server indicated it did not handle request
+            return None
         return response
     
     def _attempt_request(self, req, headers):
