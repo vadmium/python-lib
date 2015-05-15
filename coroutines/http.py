@@ -15,20 +15,20 @@ class HTTPConnection:
     def __init__(self, sock):
         self.sock = sock
     
-    def request(self, method, hostname, path):
+    def putrequest(self, method, target):
         yield from self.sock.sendall(method.encode())
         yield from self.sock.sendall(b" ")
-        for c in path.encode("utf-8"):
+        for c in target.encode("utf-8"):
             if c <= ord(b" "):
                 yield from self.sock.sendall(b"%{:02X}".format(c))
             else:
                 yield from self.sock.sendall(bytes((c,)))
         
         yield from self.sock.sendall(b" HTTP/1.1\r\n")
-        
-        yield from self.putheader("Host", hostname)  # Mandatory for 1.1
-        yield from self.putheader("User-Agent", "coroutines.http (Vadmium)")
-        # X-Forwarded-For: . . .
+    
+    AGENT = "coroutines.http (Vadmium)"
+    
+    def endheaders(self):
         yield from self.sock.sendall(b"\r\n")
     
     def putheader(self, name, value):
