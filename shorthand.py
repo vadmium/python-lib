@@ -24,3 +24,9 @@ def strip(s, start="", end=""):
 
 def bitmask(size):
     return ~(~0 << size)
+
+def floordiv(a, b):
+    return int(a // b)
+
+def ceildiv(a, b):
+    return -floordiv(-a, b)
