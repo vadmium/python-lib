@@ -5,7 +5,8 @@ from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
 from asyncio import Future
 
-def name_connect(event_driver, address, Socket, callback=None, message=None):
+async def name_connect(event_driver, address, Socket, *,
+        callback=None, message=None):
     hostname = address[0]
     if message is not None:
         callback = MessageCallback(message)
@@ -16,7 +17,7 @@ def name_connect(event_driver, address, Socket, callback=None, message=None):
         if callback is not None:
             callback.lookingup(hostname, family)
         try:
-            hostent = (yield resolve(event_driver, hostname, family))
+            hostent = await resolve(event_driver, hostname, family)
         except EnvironmentError as e:
             print(e, file=stderr)
             continue
@@ -29,7 +30,7 @@ def name_connect(event_driver, address, Socket, callback=None, message=None):
                 if callback is not None:
                     callback.connecting(attempt)
                 try:
-                    yield sock.connect(attempt)
+                    await sock.connect(attempt)
                 except EnvironmentError as e:
                     print(e, file=stderr)
                     continue
@@ -37,10 +38,10 @@ def name_connect(event_driver, address, Socket, callback=None, message=None):
             else:
                 sock.close()
                 continue
+            return sock
         except:
             sock.close()
             raise
-        raise StopIteration(sock)
     
     else:
         if resolved:
@@ -57,7 +58,7 @@ class MessageCallback(object):
     def connecting(self, address):
         self.callback("Connecting to {0}:{1}".format(*address))
 
-def resolve(event_driver, name, family=AF_UNSPEC):
+async def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(loop=event_driver)
     channel = cares.Channel(sock_state_cb=self.sock_state)
     channel.gethostbyname(name, family, self.host)
@@ -67,7 +68,7 @@ def resolve(event_driver, name, family=AF_UNSPEC):
             timeout_result = (None, None)
             timeout = event_driver.call_later(timeout,
                 self.sock_future.set_result, timeout_result)
-        result = yield from self.sock_future
+        result = await self.sock_future
         if timeout is not None and result is not timeout_result:
             timeout.cancel()
         self.sock_future = Future(loop=event_driver)
@@ -78,7 +79,7 @@ def resolve(event_driver, name, family=AF_UNSPEC):
             self.loop.add_writer(write, self.sock_future.set_result, result)
         channel.process_fd(read, write)
     cares.check(self.status)
-    raise StopIteration(self.hostent)
+    return self.hostent
 
 class ResolveContext:
     def __init__(self, *, loop):

@@ -15,32 +15,32 @@ class HTTPConnection:
     def __init__(self, sock):
         self.sock = sock
     
-    def putrequest(self, method, target):
-        yield from self.sock.sendall(method.encode())
-        yield from self.sock.sendall(b" ")
+    async def putrequest(self, method, target):
+        await self.sock.sendall(method.encode())
+        await self.sock.sendall(b" ")
         for c in target.encode("utf-8"):
             if c <= ord(b" "):
-                yield from self.sock.sendall(b"%{:02X}".format(c))
+                await self.sock.sendall(b"%{:02X}".format(c))
             else:
-                yield from self.sock.sendall(bytes((c,)))
+                await self.sock.sendall(bytes((c,)))
         
-        yield from self.sock.sendall(b" HTTP/1.1\r\n")
+        await self.sock.sendall(b" HTTP/1.1\r\n")
     
     AGENT = "coroutines.http (Vadmium)"
     
-    def endheaders(self):
-        yield from self.sock.sendall(b"\r\n")
+    async def endheaders(self):
+        await self.sock.sendall(b"\r\n")
     
-    def putheader(self, name, value):
-        yield from self.sock.sendall(name.encode("ascii"))
-        yield from self.sock.sendall(b": ")
-        yield from self.sock.sendall(value.encode("ascii"))
-        yield from self.sock.sendall(b"\r\n")
+    async def putheader(self, name, value):
+        await self.sock.sendall(name.encode("ascii"))
+        await self.sock.sendall(b": ")
+        await self.sock.sendall(value.encode("ascii"))
+        await self.sock.sendall(b"\r\n")
     
-    def getresponse(self):
+    async def getresponse(self):
         parser = Parser(self.sock)
         # else: parser.new_line()
-        yield from parser.next_char()
+        await parser.next_char()
         
         #~ try:
         if True:
@@ -48,7 +48,7 @@ class HTTPConnection:
             #~ # simple-response
             
             try:
-                pre_space = yield from parser.space()
+                pre_space = await parser.space()
             except ExcessError as e:
                 raise BadStatusLine(e.data)
             if parser.c == b"\n":
@@ -57,13 +57,13 @@ class HTTPConnection:
             pattern = b"HTTP/"
             for (i, p) in enumerate(pattern):
                 if i:
-                    yield from parser.next_char()
+                    await parser.next_char()
                 if not parser.c or ord(parser.c) != p:
                     raise BadStatusLine(pre_space + pattern[:i] + parser.c)
             
             major = bytearray()
             for _ in range(parser.NUMBER_LIMIT):
-                yield from parser.next_char()
+                await parser.next_char()
                 if parser.c == b".":
                     break
                 major.extend(parser.c)
@@ -74,7 +74,7 @@ class HTTPConnection:
             
             minor = bytearray()
             for _ in range(parser.NUMBER_LIMIT):
-                yield from parser.next_char()
+                await parser.next_char()
                 if not parser.c.isdigit():
                     break
                 minor.extend(parser.c)
@@ -85,12 +85,12 @@ class HTTPConnection:
             mid_space = bytearray()
             for i in range(parser.TOKEN_LIMIT):
                 if i:
-                    yield from parser.next_char()
+                    await parser.next_char()
                 if not parser.c or parser.c.isspace():
                     break
                 mid_space.extend(parser.c)
             try:
-                space = yield from parser.space()
+                space = await parser.space()
             except ExcessError as e:
                 raise BadStatusLine(pre_space + pattern + major + b"." +
                     minor + mid_space + e.data)
@@ -102,7 +102,7 @@ class HTTPConnection:
             status = bytearray()
             for i in range(3):
                 if i:
-                    yield from parser.next_char()
+                    await parser.next_char()
                 status.extend(parser.c)
                 if not parser.c.isdigit():
                     raise BadStatusLine(pre_space + pattern + major + b"." +
@@ -111,21 +111,21 @@ class HTTPConnection:
         if int(major) != 1:
             raise UnknownProtocol("HTTP/{}".format(major))
         
-        yield from parser.next_char()
-        yield from parser.space()
+        await parser.next_char()
+        await parser.space()
         
         reason = bytearray()
         for _ in range(400):
             current = parser.c
             reason.extend(current)
-            yield from parser.next_char()
+            await parser.next_char()
             if current in b"\n" and not parser.at_lws():  # Including EOF
                 break
         else:
             raise ExcessError("Status reason of 400 or more characters")
         reason = reason.rstrip()
         
-        msg = yield from parser.headers()
+        msg = await parser.headers()
         
         encodings = net.header_list(msg, "Transfer-Encoding")
         encoding = next(encodings, None)
@@ -169,8 +169,8 @@ class _LengthResponse(HTTPResponse):
             if int(dupe) != self.size:
                 raise HTTPException("Conflicting Content-Length values")
     
-    def read(self, amt):
-        data = yield from self.sock.recv(min(self.size, amt))
+    async def read(self, amt):
+        data = await self.sock.recv(min(self.size, amt))
         self.size -= len(data)
         return data
 
@@ -182,25 +182,25 @@ class _ChunkedResponse(HTTPResponse):
         self.chunks = self.Chunks()
         self.size = None
     
-    def read(self, amt):
+    async def read(self, amt):
         if not self.size:
-            self.size = yield from self.chunk_gen.next(self.chunks)
-        data = yield from self.sock.recv(min(self.size, amt))
+            self.size = await self.chunk_gen.next(self.chunks)
+        data = await self.sock.recv(min(self.size, amt))
         self.size -= len(data)
         return data
     
-    def Chunks(self):
+    async def Chunks(self):
         """
         Generator that returns chunk length
         """
         
         for _ in range(30000):
-            yield from parser.next_char()
+            await parser.next_char()
             if parser.c == b"\r":
-                yield from parser.next_char()
+                await parser.next_char()
             if parser.c == b"\n":
-                yield from parser.next_char()
-            yield from parser.space()
+                await parser.next_char()
+            await parser.space()
             
             size = 0
             for _ in range(30):
@@ -209,7 +209,7 @@ class _ChunkedResponse(HTTPResponse):
                 except ValueError:
                     break
                 size = size * 16 + digit
-                yield from parser.next_char()
+                await parser.next_char()
             else:
                 raise ExcessError("Chunk size of 30 or more digits")
             
@@ -218,17 +218,17 @@ class _ChunkedResponse(HTTPResponse):
                 i += 1
                 if i >= 3000:
                     raise ExcessError("Line of 3000 or more characters")
-                yield from self.next_char()
+                await self.next_char()
             
             if not size:
-                yield from self.chunk_gen.generate(0)
+                await self.chunk_gen.generate(0)
                 break
             
-            yield from self.chunk_gen.generate(size)
+            await self.chunk_gen.generate(size)
         else:
             raise ExcessError("30000 or more chunks")
         
-        yield from parser.headers()
+        await parser.headers()
 
 class Parser:
     """
@@ -242,7 +242,7 @@ class Parser:
     TOKEN_LIMIT = 120
     NUMBER_LIMIT = 9
     
-    def headers(self):
+    async def headers(self):
         """
         Entry with self.c = first character of headers
         Leaves with self.c not set
@@ -261,12 +261,12 @@ class Parser:
                 blank_line = True
             elif self.c != b"\r":
                 blank_line = False
-            yield from self.next_char()
+            await self.next_char()
         else:
             raise ExcessError("30000 or more headers")
         return parser.close()
     
-    def space(self):
+    async def space(self):
         """Read and skip over spaces
         
         Entry with c = any char
@@ -275,7 +275,7 @@ class Parser:
         space = bytearray()
         for i in range(self.SPACE_LIMIT):
             if i:
-                yield from self.next_char()
+                await self.next_char()
             if not self.at_lws():
                 return bytes(space)
             space.extend(self.c)
@@ -285,8 +285,8 @@ class Parser:
     def at_lws(self):
         return self.c.isspace() and self.c not in CRLF
     
-    def next_char(self):
-        self.c = yield from self.sock.recv(1)
+    async def next_char(self):
+        self.c = await self.sock.recv(1)
 
 class ExcessError(EnvironmentError):
     def __init__(self, msg, data=None):
