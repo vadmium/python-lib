@@ -291,17 +291,6 @@ class Subevent(object):
             result = ReturnResult((self.event, result.result()))
         self.set().callback(result)
 
-class FileEvent(Event):
-    def __init__(self, fd):
-        Event.__init__(self)
-        self.fd = fd
-    def writable(self):
-        self.watch((self.WRITE,))
-        return self
-    def readable(self):
-        self.watch((self.READ,))
-        return self
-
 class constructor(object):
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
     def __init__(self, cls):
