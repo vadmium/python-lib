@@ -5,6 +5,7 @@ from functions import setitem
 from functions import Function, WrapperFunction
 from functools import partial
 import os.path
+from collections import Mapping
 
 def wrap_import():
     global installed_wrapper
@@ -168,3 +169,16 @@ class CloseAll(Context):
     
     def add(self, handle):
         self.set.append(handle)
+
+class UnicodeMap(Mapping):
+    """Base class for str.translate() dictionaries"""
+    
+    def __iter__(self):
+        return iter(range(len(self)))
+    def __len__(self):
+        return sys.maxunicode + 1
+    
+    def __getitem__(self, cp):
+        return self.map_char(chr(cp))
+    def map_char(self, char):
+        raise super().__getitem__(ord(char))
