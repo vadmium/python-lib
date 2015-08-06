@@ -87,13 +87,29 @@ except ImportError:  # Python < 3.3
         def __len__(self):
             return len(frozenset().union(*self.maps))
 
+try:  # Python 3.3
+    from contextlib import ExitStack
+except ImportError:  # Python < 3.3
+    from misc import Context
+    class ExitStack(Context):
+        def __init__(self):
+            self.exit = None
+        
+        def enter_context(self, context):
+            self.exit = context.__exit__
+            return context.__enter__()
+        
+        def __exit__(self, *exc):
+            if self.exit:
+                return self.exit(*exc)
+
 def public(api):
     sys.modules[api.__module__].__all__.append(api.__name__)
     return api
 __all__ = list()
 
 @public
-def run(func=None, args=None, param_types=dict()):
+def run(func=None, args=None, param_types=dict(), cli_result=False):
     """Invokes a function using CLI arguments
     
     func: Defaults to __main__.main
@@ -104,8 +120,19 @@ def run(func=None, args=None, param_types=dict()):
         parameter's data type. By default, arguments are passed to "func" as
         unconverted strings. The special keywords "*" and "**" apply to any
         excess positional and keyword arguments.
+    cli_result: If true, the function or context manager result will be
+        displayed, or will have a method invoked as a subcommand. A
+        subcommand is invoked by passing an extra positional argument.
     
-    The command option names are the parameter keywords, and hyphenated (-)
+    If the function has a "cli_context" attribute set to True, the return
+    value is entered as a context manager. Any further return value handling
+    uses the result returned when entering the context manager.
+    
+    If the function has the "subcommand_class" attribute set, a subcommand
+    will be expected, and will invoke a method listed in the class on the
+    function or context manager result.
+    
+    The CLI option names are the parameter keywords, and hyphenated (-)
     option names are interpreted as using underscores (_) instead. Options
     may be prefixed with either a single (-) or a double (--) dash. An
     option's argument may be separated by an equals sign (=) or may be in a
@@ -125,7 +152,6 @@ def run(func=None, args=None, param_types=dict()):
     http://dev.kylealanhale.com/wiki/projects/quicli: very decorator-happy,
         with much "argparse" API and little automatic introspection
     """
-    # return value could be str or int -> System exit
     
     [func, sig, keywords, param_types] = prepare(func, param_types)
     varpos = param_kind(sig, Parameter.VAR_POSITIONAL)
@@ -210,6 +236,9 @@ def run(func=None, args=None, param_types=dict()):
         
         else:
             param = next(pos_iter, varpos)
+            if (cli_result or hasattr(func, "subcommand_class")) and (
+            param is varpos or param.default is not Parameter.empty):
+                break
             if param is not None:
                 arg = convert(param_types, param, arg)
             positional.append(arg)
@@ -224,7 +253,46 @@ def run(func=None, args=None, param_types=dict()):
         except TypeError as err:
             raise SystemExit(err)
     
-    return func(*positional, **opts)
+    result = func(*positional, **opts)
+    with ExitStack() as cleanup:
+        if getattr(func, "cli_context", False):
+            result = cleanup.enter_context(result)
+        if not cli_result and not hasattr(func, "subcommand_class"):
+            return result
+        if arg is None:
+            sys.displayhook(result)
+            return
+        
+        if arg is None:
+            all = getattr(result, "__all__", None)
+            if all is None:
+                funcs = dir(result)
+            else:
+                funcs = all
+            heading = False
+            for name in funcs:
+                if all is None and name.startswith("_"):
+                    continue
+                func = getattr(result, name)
+                if not callable(func):
+                    continue
+                if not heading:
+                    sys.stderr.write("public subcommands:\n")
+                    heading = True
+                sys.stderr.write(name)
+                [summary, _] = splitdoc(inspect.getdoc(func))
+                if summary:
+                    sys.stderr.writelines((": ", summary))
+                sys.stderr.write("\n")
+            if not heading:
+                sys.stderr.write("no public subcommands found\n")
+        else:
+            try:
+                func = getattr(result, arg)
+            except AttributeError as err:
+                err = "Invalid subcommand {!r}: {}".format(arg, err)
+                raise SystemExit(err)
+            return run(func, args, cli_result=cli_result)
 
 def convert(types, param, arg):
     convert = types.get(param.name)
@@ -390,44 +458,20 @@ def multi_param(param):
         not param.default)
 
 @public
-def main():
+def import_module(module):
+    """Calls a function from a Python module"""
+    
     import importlib
-    from types import ModuleType
     
-    if len(sys.argv) < 2 or sys.argv[1] in {"-help", "--help", "-h"}:
-        print("""\
-Calls a function from a Python module
-
-parameters: <module>[.function] [arguments | -help]
-
-If the function name is omitted, the main() function is called.""")
-        return
-    
-    name = sys.argv[1]
-    
-    (module, sep, attr) = name.rpartition(".")
     try:
-        if sep:
-            func = getattr(importlib.import_module(module), attr, None)
-        else:
-            func = None
-        if func is None:
-            module = name
-            func = importlib.import_module(module)
+        return importlib.import_module(module)
     except ImportError as err:
         if getattr(err, "name", module) != module:  # Python 3.3
             raise
         raise SystemExit(err)
-    
-    if isinstance(func, ModuleType):
-        func = getattr(func, "main", None)
-        if func is None:
-            raise SystemExit("Module {} has no main() function".format(name))
-    
-    return run(func, sys.argv[2:])
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        run(import_module, cli_result=True)
     except (KeyboardInterrupt, BrokenPipeError):
         raise SystemExit(1)

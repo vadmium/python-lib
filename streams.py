@@ -4,14 +4,6 @@ from functions import instantiated
 class TeeWriter(BufferedIOBase):
     def __init__(self, *outputs):
         self.outputs = outputs
-    def close(self):
-        for output in self.outputs:
-            output.close()
-        return BufferedIOBase.close(self)
-    def flush(self):
-        for output in self.outputs:
-            output.flush()
-        return BufferedIOBase.flush(self)
     def write(self, b):
         for output in self.outputs:
             output.write(b)

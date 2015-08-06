@@ -188,8 +188,6 @@ class TestHttpEstablishError(TestMockHttp):
         self.HTTPConnection.connect_exception = exception
         try:
             self.urlopen("mock://dummy")
-        except http.client.HTTPException:
-            raise
         except EnvironmentError as err:
             if err.errno != ECONNREFUSED:
                 raise
