@@ -10,22 +10,11 @@ try:  # Python 3.3
     from inspect import signature, Parameter
 except ImportError:  # Python < 3.3
     from collections import namedtuple
-    
-    try:  # Python 3
-        from inspect import getfullargspec
-    except ImportError:  # Python < 3
-        from inspect import getargspec
-        FullArgSpec = namedtuple("FullArgSpec", """
-            args, varargs, varkw, defaults,
-            kwonlyargs, kwonlydefaults, annotations""")
-        def getfullargspec(*pos, **kw):
-            argspec = getargspec(*pos, **kw)
-            return FullArgSpec(*argspec,
-                kwonlyargs=(), kwonlydefaults=None, annotations=None)
+    from inspect import getargspec
     
     class signature:
         def __init__(self, func):
-            argspec = getfullargspec(func)
+            argspec = getargspec(func)
             self.parameters = OrderedDict()
             defaults_start = -len(argspec.defaults or ())
             for (i, name) in enumerate(argspec.args, -len(argspec.args)):
@@ -38,11 +27,7 @@ except ImportError:  # Python < 3.3
             if argspec.varargs is not None:
                 self.parameters[argspec.varargs] = Parameter(argspec.varargs,
                     Parameter.VAR_POSITIONAL, None)
-            for name in argspec.kwonlyargs:
-                default = argspec.kwonlydefaults.get(name, Parameter.empty)
-                self.parameters[name] = Parameter(name,
-                    Parameter.KEYWORD_ONLY, default)
-            if argspec.varkw is not None:
+            if argspec.keywords is not None:
                 self.parameters[argspec.varkw] = Parameter(argspec.varkw,
                     Parameter.VAR_KEYWORD, None)
             
