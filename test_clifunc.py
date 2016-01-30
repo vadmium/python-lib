@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import sys
-from unittest import TestCase, TestSuite, SkipTest
+from unittest import TestCase, SkipTest
 from functions import decorator
 from clifunc import run
 import clifunc
@@ -12,19 +12,9 @@ except ImportError:  # Python 3
     from io import StringIO
 
 @decorator
-def suite_add(suite, Test):
-    suite.addTest(Test())
-    return Test
-
-@decorator
 def testfunc(func, base=TestCase):
     return type(func.__name__, (base,), dict(runTest=func))
 
-def load_tests(loader, default, pattern):
-    return suite
-suite = TestSuite()
-
-@suite_add(suite)
 @testfunc()
 def help(self):
     """Test help works and everything that is meant to be there is there"""
@@ -42,7 +32,6 @@ defaults: -optzero=0
 Docstring body
 """, capture.getvalue())
 
-@suite_add(suite)
 @testfunc()
 def positional(self):
     """Test function is called correctly"""
@@ -51,7 +40,6 @@ def positional(self):
     self.assertEqual(dict(fixture.defaults, mand="em", mand_opt="emo"),
         fixture.values)
 
-@suite_add(suite)
 @testfunc()
 def options(self):
     fixture = Fixture()
@@ -64,7 +52,6 @@ def options(self):
         mand_opt="emo", optzero="ozed", multi_opt=["mo1"], noarg_opt=True,
     ), fixture.values)
 
-@suite_add(suite)
 @testfunc()
 def types(self):
     """Test argument types"""
@@ -82,7 +69,6 @@ def types(self):
     self.assertEqual(-12, fixture.values["optzero"])
     self.assertEqual([float("inf"), 10], fixture.values["multi_opt"])
 
-@suite_add(suite)
 @testfunc()
 def type_names(self):
     """Parameter name checking for "param_types" attribute"""
@@ -91,7 +77,6 @@ def type_names(self):
     with self.assertRaises(TypeError):
         run(fixture.f, "x -mand-opt=x".split())
 
-@suite_add(suite)
 @testfunc()
 def nodoc(self):
     """Help should work without any docstring"""
@@ -100,7 +85,6 @@ def nodoc(self):
         pass
     clifunc.help(f, StringIO())
 
-@suite_add(suite)
 @testfunc()
 def frozen(self):
     """Input parameters should not be modified"""
