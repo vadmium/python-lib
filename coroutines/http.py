@@ -195,6 +195,7 @@ class _ChunkedResponse(HTTPResponse):
         """
         
         for _ in range(30000):
+            parser = Parser(self.sock)
             yield from parser.next_char()
             if parser.c == b"\r":
                 yield from parser.next_char()
