@@ -18,9 +18,11 @@ class HTTPConnection:
     def putrequest(self, method, target):
         yield from self.sock.sendall(method.encode())
         yield from self.sock.sendall(b" ")
-        for c in target.encode("utf-8"):
+        if isinstance(target, str):
+            target = target.encode("ascii")
+        for c in target:
             if c <= ord(b" "):
-                yield from self.sock.sendall(b"%{:02X}".format(c))
+                yield from self.sock.sendall("%{:02X}".format(c).encode("ascii"))
             else:
                 yield from self.sock.sendall(bytes((c,)))
         
