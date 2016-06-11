@@ -30,6 +30,10 @@ class Form(object):
         widget.grid(row=row, column=self.column + 1, sticky=widget_sticky)
 
 def scroll(view, vert=True, horiz=True, resize=True):
+    """Sets up scrollbars on view's master.
+    
+    The view should not have any layout settings of its own."""
+    
     kw = dict()
     if resize:
         if not horiz:

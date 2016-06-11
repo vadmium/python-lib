@@ -4,7 +4,7 @@ import tkinter
 from tkinter.filedialog import (askopenfilename, asksaveasfilename)
 from tkinter import StringVar
 from tkinter import Toplevel
-from tkwrap import ScrolledTree
+import tkwrap
 from tkinter.font import nametofont
 from tkwrap import font_size
 import tkwrap
@@ -99,62 +99,63 @@ class Ttk(object):
         def init(gui, ctrl, window, master, focus=False, resize=False,
         **kw):
             ctrl.place(gui)
-            ctrl.widget = ScrolledTree(master, columns=ctrl.columns,
-                resize=resize, **kw)
+            ctrl.widget = ttk.Frame(master)
+            ctrl.tree = tkwrap.Tree(ctrl.widget, columns=ctrl.columns, **kw)
+            tkwrap.scroll(ctrl.tree, resize=resize)
             
             if ctrl.selected:
                 #~ self.select_binding = self.evc_list.bind_select(self.select)
                 select = partial(gui.TreeBase.select, gui, ctrl)
-                ctrl.widget.bind_select(select)
+                ctrl.tree.bind_select(select)
             if ctrl.opened:
                 open = partial(gui.TreeBase.open, gui, ctrl)
-                ctrl.widget.tree.bind("<<TreeviewOpen>>", open)
+                ctrl.tree.bind("<<TreeviewOpen>>", open)
             if window.command:
                 activate = partial(gui.activate, window)
-                ctrl.widget.tree.bind("<Double-1>", activate)
+                ctrl.tree.bind("<Double-1>", activate)
             
             if focus:
-                ctrl.widget.tree.focus_set()
+                ctrl.tree.focus_set()
                 return True
         
         def clear(gui, ctrl):
-            return ctrl.widget.tree.delete(*ctrl.widget.tree.get_children())
+            return ctrl.tree.delete(*ctrl.tree.get_children())
         
         def add(gui, ctrl, *pos, selected=False, **kw):
-            item = ctrl.widget.add(*pos, **kw)
+            item = ctrl.tree.add(*pos, **kw)
             if selected:
                 # Empty selection returns empty string?!
-                selection = tuple(ctrl.widget.tree.selection())
-                ctrl.widget.tree.selection_set(selection + (item,))
+                selection = tuple(ctrl.tree.selection())
+                ctrl.tree.selection_set(selection + (item,))
             return item
         
         def remove(gui, ctrl, item):
-            focus = ctrl.widget.tree.focus()
+            focus = ctrl.tree.focus()
             if focus == item:
-                new = ctrl.widget.tree.next(focus)
+                new = ctrl.tree.next(focus)
                 if not new:
-                    new = ctrl.widget.tree.prev(focus)
+                    new = ctrl.tree.prev(focus)
                 if not new:
-                    new = ctrl.widget.tree.parent(focus)
+                    new = ctrl.tree.parent(focus)
             else:
                 new = ""
             
-            ctrl.widget.tree.delete(item)
+            ctrl.tree.delete(item)
             
             if new:
-                ctrl.widget.tree.focus(new)
+                ctrl.tree.focus(new)
         
         def selection(gui, ctrl):
-            return ctrl.widget.tree.selection()
+            return ctrl.tree.selection()
         
         def select(gui, ctrl, event):
             ctrl.selected()
             
         def open(gui, ctrl, event):
-            ctrl.opened(ctrl.widget.tree.focus())
+            ctrl.opened(ctrl.tree.focus())
         
         def iter(gui, ctrl):
-            return iter(ctrl.widget.tree.get_children())
+            return iter(ctrl.tree.get_children())
     
     @setitem(controls, List)
     class _List(TreeBase):
@@ -165,7 +166,7 @@ class Ttk(object):
             return gui.TreeBase.add(gui, ctrl, *pos, values=columns, **kw)
             
         def get(gui, ctrl, item):
-            return ctrl.widget.tree.item(item, option="values")
+            return ctrl.tree.item(item, option="values")
     
     @setitem(controls, Tree)
     class Tree(TreeBase):
@@ -177,10 +178,10 @@ class Ttk(object):
         def children(gui, ctrl, parent):
             if not parent:
                 parent = ""
-            return ctrl.widget.tree.get_children(parent)
+            return ctrl.tree.get_children(parent)
         
         def set(gui, ctrl, item, text):
-            ctrl.widget.tree.item(item, text=text)
+            ctrl.tree.item(item, text=text)
     
     @setitem(controls, MenuEntry)
     class MenuEntry(object):
