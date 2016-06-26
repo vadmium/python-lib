@@ -34,7 +34,7 @@ class EventLoop(BaseEventLoop):
             callback()
     
     def run_until_complete(self, future):
-        future = asyncio.async(future, loop=self)
+        future = asyncio.ensure_future(future, loop=self)
         future.add_done_callback(self._stop_callback)
         self.run_forever()
         return future.result()
