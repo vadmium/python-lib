@@ -2,6 +2,7 @@ import cares
 from socket import (AF_UNSPEC, AF_INET, AF_INET6)
 from sys import stderr
 from asyncio import Future
+from net import format_addr
 
 async def name_connect(event_driver, address, Socket, *,
         callback=None, message=None):
@@ -54,7 +55,7 @@ class MessageCallback:
     def lookingup(self, name, family):
         self.callback("Looking up {} (family {})".format(name, family))
     def connecting(self, address):
-        self.callback("Connecting to {}:{}".format(*address))
+        self.callback("Connecting to " + format_addr(address))
 
 async def resolve(event_driver, name, family=AF_UNSPEC):
     self = ResolveContext(loop=event_driver)
