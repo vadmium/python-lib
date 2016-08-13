@@ -4,6 +4,19 @@ from socketserver import BaseServer
 import sys
 from ssl import SSLError
 from misc import Context
+import urllib.request
+import http.client
+from errno import EPIPE, ENOTCONN, ECONNRESET
+from select import select
+from contextlib import contextmanager
+from streams import DelegateWriter
+
+try:  # Python 3.3
+    ConnectionError
+except NameError:  # Python < 3.3
+    ConnectionError = ()
+
+DISCONNECTION_ERRNOS = {EPIPE, ENOTCONN, ECONNRESET}
 
 def url_port(url, scheme, ports):
     """Raises "ValueError" if the URL is not valid"""
@@ -40,9 +53,9 @@ scheme=None, netloc=None, path=None, params=None, query=None, fragment=None):
     return urllib.parse.urlunparse(res)
 
 def format_addr(address):
-    (address, port) = address
+    [address, port] = address
     if not frozenset("[]:").isdisjoint(address):
-        addrss = "[{}]".format(address)
+        address = "[{}]".format(address)
     if port is not None:
         address = "{}:{}".format(address, port)
     return address
@@ -150,3 +163,162 @@ class Server(BaseServer, Context):
             self.close_request(request)
             raise  # Force server loop to exit
         super().handle_error(request, client_address)
+
+class PersistentConnectionHandler(urllib.request.BaseHandler):
+    """URL handler for HTTP persistent connections
+    
+    with PersistentConnectionHandler(timeout=10) as handler:
+        opener = urllib.request.build_opener(handler)
+        
+        # First request opens connection
+        with opener.open("http://localhost/one") as response:
+            response.read()
+        
+        # Subsequent requests reuse existing connection, unless it got closed
+        with opener.open("http://localhost/two") as response:
+            response.read()
+        
+        # Closes old connection when new host specified
+        with opener.open("http://example/three") as response:
+            response.read()
+    # Socket freed at context manager exit
+    
+    Currently does not reuse an existing connection if
+    two host names happen to resolve to the same Internet address.
+    """
+    
+    conn_classes = {
+        "http": http.client.HTTPConnection,
+        "https": http.client.HTTPSConnection,
+    }
+    
+    def __init__(self, *pos, **kw):
+        self._type = None
+        self._host = None
+        self._pos = pos
+        self._kw = kw
+        self._connection = None
+    
+    def default_open(self, req):
+        if req.type not in self.conn_classes:
+            return None
+        
+        with self._setup_request(req):
+            headers = dict(req.header_items())
+            # On a fresh connection, only attempt request once
+            response = self._reuse_connection(req, headers)
+            if not response:
+                # (Re)try request on a fresh connection
+                self._attempt_request(req, headers)
+                response = self._connection.getresponse()
+        
+        # Odd impedance mismatch between "http.client" and "urllib.request"
+        response.msg = response.reason
+        return response
+    
+    def start_request(self, request):
+        with self._setup_request(request):
+            self._check_reusable()
+            self._connection.putrequest(
+                request.get_method(), request.selector)
+            for item in request.header_items():
+                self._connection.putheader(*item)
+            self._connection.endheaders()
+    
+    def get_writer(self):
+        return DelegateWriter(self._connection.send)
+    
+    def get_response(self):
+        response = self._connection.getresponse()
+        response.msg.set_default_type(None)
+        return response
+    
+    @contextmanager
+    def _setup_request(self, req):
+        if req.type != self._type or req.host != self._host:
+            if self._connection:
+                self._connection.close()
+            conn_class = self.conn_classes[req.type]
+            self._connection = conn_class(req.host, *self._pos, **self._kw)
+            self._type = req.type
+            self._host = req.host
+        
+        try:
+            yield
+        except:
+            self._connection.close()  # Allow caller to make more requests
+            raise
+    
+    def _check_reusable(self):
+        if self._connection.sock is None:
+            return False
+        if any(select((self._connection.sock,), (), (), 0)):
+            # Assume EOF or 408 Request Timeout has been signalled
+            self._connection.close()
+            return False
+        return True
+    
+    def _reuse_connection(self, req, headers):
+        if not self._check_reusable():
+            return None
+        # Attempt request on existing connection
+        self._attempt_request(req, headers)
+        try:
+            try:
+                response = self._connection.getresponse()
+            except EnvironmentError as err:  # Python < 3.3 compat.
+                if err.errno not in DISCONNECTION_ERRNOS:
+                    raise
+                raise http.client.BadStatusLine(err) from err
+        except (ConnectionError, http.client.BadStatusLine):
+            idempotents = {
+                "GET", "HEAD", "PUT", "DELETE", "TRACE", "OPTIONS"}
+            if req.get_method() not in idempotents:
+                raise
+            self._connection.close()
+            return None  # Retry requests whose method indicates idempotence
+        if response.status == http.client.REQUEST_TIMEOUT:
+            # Server indicated it did not handle request
+            return None
+        return response
+    
+    def _attempt_request(self, req, headers):
+        """Send HTTP request, ignoring broken pipe and similar errors"""
+        try:
+            self._connection.request(req.get_method(), req.selector,
+                req.data, headers)
+        except (ConnectionRefusedError, ConnectionAbortedError):
+            raise  # Assume connection was not established
+        except ConnectionError:
+            pass  # Continue and read server response if available
+        except EnvironmentError as err:  # Python < 3.3 compatibility
+            if err.errno not in DISCONNECTION_ERRNOS:
+                raise
+    
+    def close(self):
+        if self._connection:
+            self._connection.close()
+    
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc):
+        self.close()
+
+def http_request(url, types=None, *,
+        urlopen=urllib.request.urlopen, headers=(), **kw):
+    headers = dict(headers)
+    if types is not None:
+        headers["Accept"] = ", ".join(types)
+    req = urllib.request.Request(url, headers=headers, **kw)
+    response = urlopen(req)
+    try:
+        headers = response.info()
+        headers.set_default_type(None)
+        type = headers.get_content_type()
+        if types is not None and type not in types:
+            msg = "Unexpected content type {}"
+            raise TypeError(msg.format(type))
+        return response
+    except:
+        response.close()
+        raise

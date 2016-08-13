@@ -13,6 +13,14 @@ class dummywriter(BufferedIOBase):
     def write(self, b):
         pass
 
+class DelegateWriter(BufferedIOBase):
+    def __init__(self, write):
+        self._write = write
+    def write(self, b):
+        self._write(b)
+        with memoryview(b) as view:
+            return view.nbytes
+
 def streamcopy(input, output, length):
     if length < 0:
         raise ValueError("Negative length")

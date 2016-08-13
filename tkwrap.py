@@ -155,12 +155,14 @@ class Tree(Treeview):
         for column in self.nontree_columns:
             yield column
     
-    def add(self, parent="", *args, **kw):
+    def add(self, parent="", *args, expand=False, **kw):
         if not isinstance(kw.get("values", ()), Sequence):
             kw["values"] = tuple(kw["values"])
         child = self.insert(parent, "end", *args, **kw)
         if not self.focus():
             self.focus(child)
+        if not expand:
+            return child
         
         auto = iter(self.auto_width)
         if self.tree_shown and next(auto):

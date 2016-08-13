@@ -1,11 +1,15 @@
 #! /usr/bin/env python3
 
 import sys
-from io import StringIO
-from unittest import (TestCase, TestSuite)
+from unittest import TestCase, TestSuite, SkipTest
 from functions import decorator
 from clifunc import run
 import clifunc
+
+try:  # Python < 3
+    from cStringIO import StringIO
+except ImportError:  # Python 3
+    from io import StringIO
 
 @decorator
 def suite_add(suite, Test):
@@ -114,7 +118,6 @@ def frozen(self):
 # Test variable arguments
 # Test variable keyword arguments
 # Test __main__.main and argv defaults
-# Skip testing keyword-only arguments for Python 2
 
 class Fixture(object):
     params = (
@@ -130,16 +133,21 @@ class Fixture(object):
     def __init__(self):
         self.values = dict()
         
-        def func(mand, defnone=None, noarg=False, multi=(), *var,
-        mand_opt, optzero=0, noarg_opt=False, multi_opt=frozenset()):
-            """Summary line
-            
-            Docstring body"""
-            
-            nonlocal self
-            for name in self.params:
-                self.values[name] = vars()[name]
-        self.f = func
+        scope = dict()
+        try:  # Python 3
+            exec(r'''\
+                def func(mand, defnone=None, noarg=False, multi=(), *var,
+                mand_opt, optzero=0, noarg_opt=False, multi_opt=frozenset()):
+                    """Summary line
+                    
+                    Docstring body"""
+                    
+                    for name in self.params:
+                        self.values[name] = vars()[name]
+                ''', locals(), scope)
+        except SyntaxError as err:  # Python < 3
+            raise SkipTest(err)
+        self.f = scope["func"]
 
 if __name__ == "__main__":
     import unittest
