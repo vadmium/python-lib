@@ -9,7 +9,7 @@ from http.client import (
 import http.client
 import email.parser
 import net
-from . import AsyncioGenerator
+from asyncio import Future
 
 class HTTPConnection:
     def __init__(self, sock):
@@ -18,9 +18,11 @@ class HTTPConnection:
     async def putrequest(self, method, target):
         await self.sock.sendall(method.encode())
         await self.sock.sendall(b" ")
-        for c in target.encode("utf-8"):
+        if isinstance(target, str):
+            target = target.encode("ascii")
+        for c in target:
             if c <= ord(b" "):
-                await self.sock.sendall(b"%{:02X}".format(c))
+                await self.sock.sendall("%{:02X}".format(c).encode("ascii"))
             else:
                 await self.sock.sendall(bytes((c,)))
         
@@ -178,13 +180,19 @@ class _ChunkedResponse(HTTPResponse):
     def __init__(self, status, reason, msg, sock):
         HTTPResponse.__init__(self, status, reason, msg)
         self.sock = sock
-        self.chunk_gen = AsyncioGenerator()
-        self.chunks = self.Chunks()
+        self.chunk_read = None
+        sock.loop.create_task(self.Chunks())
         self.size = None
     
     async def read(self, amt):
         if not self.size:
-            self.size = await self.chunk_gen.next(self.chunks)
+            self.next_size = Future(loop=self.sock.loop)
+            if self.chunk_read:
+                self.chunk_read.set_result(None)
+            try:
+                [self.size, self.chunk_read] = await self.next_size
+            except EOFError:
+                return b""
         data = await self.sock.recv(min(self.size, amt))
         self.size -= len(data)
         return data
@@ -195,6 +203,7 @@ class _ChunkedResponse(HTTPResponse):
         """
         
         for _ in range(30000):
+            parser = Parser(self.sock)
             await parser.next_char()
             if parser.c == b"\r":
                 await parser.next_char()
@@ -218,16 +227,18 @@ class _ChunkedResponse(HTTPResponse):
                 i += 1
                 if i >= 3000:
                     raise ExcessError("Line of 3000 or more characters")
-                await self.next_char()
+                await parser.next_char()
             
             if not size:
-                await self.chunk_gen.generate(0)
                 break
             
-            await self.chunk_gen.generate(size)
+            chunk_read = Future(loop=self.sock.loop)
+            self.next_size.set_result((size, chunk_read))
+            await chunk_read
         else:
             raise ExcessError("30000 or more chunks")
         
+        self.next_size.set_exception(EOFError())
         await parser.headers()
 
 class Parser:

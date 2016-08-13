@@ -18,7 +18,6 @@ class Socket(Context):
                 self.sock.connect(*args, **kw)
                 break
             except BlockingIOError:
-                # Avoid yielding in exception handler
                 pass
             future = Future(loop=self.loop)
             self.loop.add_writer(self.sock.fileno(), future.set_result, None)
@@ -29,7 +28,6 @@ class Socket(Context):
             try:
                 return self.sock.recv(*args, **kw)
             except (BlockingIOError, SSLWantReadError):
-                # Avoid yielding in exception handler
                 pass
             future = Future(loop=self.loop)
             self.loop.add_reader(self.sock.fileno(), future.set_result, None)
