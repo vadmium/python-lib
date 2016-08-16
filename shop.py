@@ -1,7 +1,6 @@
 from sys import stderr
 from io import BufferedIOBase
 from net import http_request
-from urllib.parse import urlsplit
 import os, os.path
 import hashlib
 from base64 import urlsafe_b64encode
@@ -10,9 +9,8 @@ import email.generator
 
 def get_cached(url, urlopen, cleanup):
     print(end="GET {} ".format(url), flush=True, file=stderr)
-    split = urlsplit(url)
-    path = split.path.split("/")
-    dir = os.path.join(split.scheme, split.netloc, *path[:-1])
+    path = url.split("/")
+    dir = os.path.join(*path[:-1])
     suffix = hashlib.md5(url.encode()).digest()[:6]
     suffix = urlsafe_b64encode(suffix).decode("ascii")
     if path[-1]:
