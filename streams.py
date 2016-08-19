@@ -1,23 +1,12 @@
 from io import BufferedIOBase, IOBase
 from functions import instantiated
 
-class TeeWriter(BufferedIOBase):
-    def __init__(self, *outputs):
-        self.outputs = outputs
-    def write(self, b):
-        for output in self.outputs:
-            output.write(b)
-
-@instantiated
-class dummywriter(BufferedIOBase):
-    def write(self, b):
-        pass
-
 class DelegateWriter(IOBase):
-    def __init__(self, write):
-        self._write = write
+    def __init__(self, *delegates):
+        self.delegates = list(delegates)
     def write(self, x):
-        self._write(x)
+        for write in self.delegates:
+            write(x)
         return len(x)
 
 def streamcopy(input, output, length):
