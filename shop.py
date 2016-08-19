@@ -1,6 +1,6 @@
 from sys import stderr
 from io import BufferedIOBase
-from net import http_request
+from net import http_request, header_list
 import os, os.path
 import hashlib
 from base64 import urlsafe_b64encode
@@ -21,14 +21,20 @@ def get_cached(url, urlopen, cleanup):
         metadata = open(metadata, "rb")
     except FileNotFoundError:
         os.makedirs(dir, exist_ok=True)
-        suffix += "html"
-        cache = open(os.path.join(dir, suffix), "xb")
-        cleanup.enter_context(cache)
         with open(metadata, "xb") as metadata:
             types = ("text/html",)
-            response = http_request(url, types, urlopen=urlopen)
+            response = http_request(url, types,
+                headers={"Accept-Encoding": "gzip, x-gzip"},
+                urlopen=urlopen)
             cleanup.enter_context(response)
             print(response.status, response.reason, flush=True, file=stderr)
+            suffix += "html"
+            for encoding in header_list(response.info(), "Content-Encoding"):
+                if encoding.lower() in {"gzip", "x-gzip"}:
+                    suffix += os.extsep + "gz"
+                    break
+            cache = open(os.path.join(dir, suffix), "xb")
+            cleanup.enter_context(cache)
             msg = Message()
             msg.add_header("Content-Type",
                 "message/external-body; access-type=local-file",
