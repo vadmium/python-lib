@@ -28,8 +28,21 @@ def get_cached(url, urlopen, cleanup):
                 urlopen=urlopen)
             cleanup.enter_context(response)
             print(response.status, response.reason, flush=True, file=stderr)
+            
+            header = response.info()
+            for field in header_list(header, "Connection"):
+                del header[field]
+            for field in (
+                "Close", "Connection", "Content-Length", "Keep-Alive",
+                "Proxy-Authenticate", "Proxy-Authorization",
+                "Public",
+                "Transfer-Encoding", "TE", "Trailer",
+                "Upgrade",
+            ):
+                del header[field]
+            
             suffix += "html"
-            for encoding in header_list(response.info(), "Content-Encoding"):
+            for encoding in header_list(header, "Content-Encoding"):
                 if encoding.lower() in {"gzip", "x-gzip"}:
                     suffix += os.extsep + "gz"
                     break
@@ -39,11 +52,11 @@ def get_cached(url, urlopen, cleanup):
             msg.add_header("Content-Type",
                 "message/external-body; access-type=local-file",
                 name=suffix)
-            msg.attach(response.info())
+            msg.attach(header)
             metadata = email.generator.BytesGenerator(metadata,
                 mangle_from_=False, maxheaderlen=0)
             metadata.flatten(msg)
-        return (response.info(), TeeReader(response, cache.write))
+        return (header, TeeReader(response, cache.write))
     with metadata:
         msg = email.message_from_binary_file(metadata)
     cache = os.path.join(dir, msg.get_param("name"))
