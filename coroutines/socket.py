@@ -12,44 +12,48 @@ class Socket(Context):
         self.sock = socket.socket(*args, **kw)
         self.sock.setblocking(False)
     
-    def connect(self, *args, **kw):
+    async def connect(self, *args, **kw):
         while True:
             try:
                 self.sock.connect(*args, **kw)
                 break
             except BlockingIOError:
-                # Avoid yielding in exception handler
                 pass
             future = Future(loop=self.loop)
             self.loop.add_writer(self.sock.fileno(), future.set_result, None)
-            yield from future
+            await future
     
-    def recv(self, *args, **kw):
+    async def recv(self, *args, **kw):
         while True:
             try:
                 return self.sock.recv(*args, **kw)
             except (BlockingIOError, SSLWantReadError):
-                # Avoid yielding in exception handler
                 pass
             future = Future(loop=self.loop)
             self.loop.add_reader(self.sock.fileno(), future.set_result, None)
-            yield from future
+            await future
     
-    def sendall(self, data, *args, **kw):
+    async def sendall(self, data, *args, **kw):
         while data:
-            data = data[self.sock.send(data, *args, **kw):]
-        if False:
-            yield
+            try:
+                data = data[self.sock.send(data, *args, **kw):]
+                break
+            except SSLWantReadError:
+                future = Future(loop=self.loop)
+                self.loop.add_reader(self.sock.fileno(), future.set_result,
+                    None)
+                await future
     
     def close(self, *args, **kw):
         self.sock.close(*args, **kw)
 
 class Ssl(Socket):
-    def __init__(self, *args, **kw):
-        Socket.__init__(self, *args, **kw)
-        self.sock = ssl.wrap_socket(self.sock, do_handshake_on_connect=False)
+    def __init__(self, context, socket):
+        self.loop = socket.loop
+        self.sock = context.wrap_socket(socket.sock,
+            do_handshake_on_connect=False)
     
-    def handshake(self, *args, **kw):
+    async def handshake(self, *args, **kw):
         while True:
             try:
                 self.sock.do_handshake(*args, **kw)
@@ -60,4 +64,4 @@ class Ssl(Socket):
                 add_watcher = self.loop.add_writer
             future = Future(loop=self.loop)
             add_watcher(self.sock.fileno(), future.set_result, None)
-            yield from future
+            await future

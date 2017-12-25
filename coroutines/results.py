@@ -1,7 +1,7 @@
 import sys
 from functools import partial
 
-class Result(object):
+class Result:
     """Base class for abstracting function call and expression results
     
     Abstract methods:

@@ -187,14 +187,18 @@ class Tree(Treeview):
             if width > self.column("#0", option="width"):
                 self.column("#0", width=ceil(width))
         
-        for (i, value) in enumerate(kw.get("values", ())):
+        for i in self.nontree_columns:
             if not next(auto):
                 continue
-            width = self.text_font.measure(value) + self.space_size
+            width = self.min_width(child, i)
             if width > self.column(i, option="width"):
                 self.column(i, width=width)
         
         return child
+    
+    def min_width(self, item, column):
+        text = self.set(item, column)
+        return self.text_font.measure(text) + self.space_size
     
     def bind_select(self, *args, **kw):
         return self.bind("<<TreeviewSelect>>", *args, **kw)

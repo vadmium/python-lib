@@ -1,15 +1,4 @@
-"""Support for event-driven generators
-
-PEP 380 "Syntax for delegating to a subgenerator" ["yield from"]:
-http://www.python.org/dev/peps/pep-0380
-
-Similar generator wrapper implementation:
-https://mail.python.org/pipermail/python-dev/2010-July/102320.html
-
-"Weightless" looks rather up-to-date. It mentions PEP 380. But 0.6.0.1 apparently only compiles with Python 2.
-http://www.weightless.io/
-* Has a survey of other implementations
-"""
+"""Framework for driving async coroutine tasks"""
 
 import weakref
 from functions import weakmethod
@@ -45,7 +34,7 @@ class EventLoop(BaseEventLoop):
             callback()
     
     def run_until_complete(self, future):
-        future = asyncio.async(future, loop=self)
+        future = asyncio.ensure_future(future, loop=self)
         future.add_done_callback(self._stop_callback)
         self.run_forever()
         return future.result()
@@ -166,7 +155,7 @@ class MainTask(asyncio.Task):
                 exception=exc,
             ))
 
-class Event(object):
+class Event:
     """Base class that a thread can yield to wait for an event
     
     The default implementation has a "callback" attribute which can be called
@@ -291,18 +280,7 @@ class Subevent(object):
             result = ReturnResult((self.event, result.result()))
         self.set().callback(result)
 
-class FileEvent(Event):
-    def __init__(self, fd):
-        Event.__init__(self)
-        self.fd = fd
-    def writable(self):
-        self.watch((self.WRITE,))
-        return self
-    def readable(self):
-        self.watch((self.READ,))
-        return self
-
-class constructor(object):
+class constructor:
     """Decorator wrapper for classes whose __init__ method is a coroutine"""
     def __init__(self, cls):
         self.cls = cls
@@ -311,7 +289,7 @@ class constructor(object):
         yield o.__init__(*args, **kw)
         raise StopIteration(o)
 
-class Lock(object):
+class Lock:
     def __init__(self):
         self.locked = False
         self.waiting = []
@@ -325,7 +303,7 @@ class Lock(object):
         with cascade:
             self.locked = True
 
-class LockContext(object):
+class LockContext:
     def __init__(self, lock):
         self.lock = lock
     def  __enter__(self):
@@ -343,7 +321,7 @@ class LockContext(object):
         returns the context via StopIteration"""
         return LockCascade(self)
 
-class LockCascade(object):
+class LockCascade:
     def __init__(self, context):
         self.context = context
     def __enter__(self):

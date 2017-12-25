@@ -313,8 +313,7 @@ def http_request(url, types=None, *,
     response = urlopen(req)
     try:
         headers = response.info()
-        headers.set_default_type(None)
-        type = headers.get_content_type()
+        [type, _] = headers.get_params([(None, None)])[0]
         if types is not None and type not in types:
             msg = "Unexpected content type {}"
             raise TypeError(msg.format(type))
