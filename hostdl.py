@@ -5,6 +5,9 @@ class HtmlTreeParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self._builder = TreeBuilder()
+        
+        # Avoid error about multiple top-level elements
+        self._builder.start("", dict())
     
     def close(self):
         super().close()
