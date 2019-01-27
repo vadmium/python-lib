@@ -28,3 +28,35 @@ class CounterWriter(BufferedIOBase):
         return self.output.write(b)
     def tell(self):
         return self.length
+
+class TeeReader(BufferedIOBase):
+    def readable(self):
+        return True
+    
+    def __init__(self, source, *write):
+        self._source = source
+        self._write = write
+    
+    def read(self, *pos, **kw):
+        result = self._source.read(*pos, **kw)
+        self._call_write(result)
+        return result
+    def read1(self, *pos, **kw):
+        result = self._source.read1(*pos, **kw)
+        self._call_write(result)
+        return result
+    
+    def readinto(self, b):
+        n = self._readinto(b)
+        with memoryview(b) as view, view.cast("B") as bytes:
+            self._call_write(bytes[:n])
+        return n
+    def readinto1(self, b):
+        n = self._readinto(b)
+        with memoryview(b) as view, view.cast("B") as bytes:
+            self._call_write(bytes[:n])
+        return n
+    
+    def _call_write(self, b):
+        for write in self._write:
+            write(b)
