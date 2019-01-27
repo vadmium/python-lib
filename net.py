@@ -327,8 +327,12 @@ def http_request(url, types=None, *,
         response.close()
         raise
 
-def get_cached(url, urlopen, cleanup):
-    print(end="GET {} ".format(url), flush=True, file=sys.stderr)
+def request_cached(url, type, msg=None, *,
+        method="GET", headers=(), cleanup, **kw):
+    if msg is None:
+        msg = url
+    print(method, msg, end=" ", flush=True, file=sys.stderr)
+    
     path = url.split("/")
     dir = os.path.join(*path[:-1])
     suffix = hashlib.md5(url.encode()).digest()[:6]
@@ -342,10 +346,12 @@ def get_cached(url, urlopen, cleanup):
     except FileNotFoundError:
         os.makedirs(dir, exist_ok=True)
         with open(metadata, "xb") as metadata:
-            types = ("text/html",)
-            response = http_request(url, types,
-                headers={"Accept-Encoding": "gzip, x-gzip"},
-                urlopen=urlopen)
+            response = http_request(url, (type,),
+                method=method,
+                headers=headers + (
+                    ("Accept-Encoding", "gzip, x-gzip"),
+                ),
+            **kw)
             cleanup.enter_context(response)
             print(response.status, response.reason, flush=True,
                 file=sys.stderr)
@@ -362,7 +368,11 @@ def get_cached(url, urlopen, cleanup):
             ):
                 del header[field]
             
-            suffix += "html"
+            [type, value] = header.get_params()[0]
+            suffix += {
+                'text/html': 'html', 'text/javascript': 'js',
+                'application/json': 'json',
+            }[type]
             for encoding in header_list(header, "Content-Encoding"):
                 if encoding.lower() in {"gzip", "x-gzip"}:
                     suffix += os.extsep + "gz"
