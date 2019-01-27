@@ -14,7 +14,13 @@ class HtmlTreeParser(HTMLParser):
         return self._builder.close()
     
     def handle_starttag(self, tag, attrs):
-        self._builder.start(tag, dict(attrs))
+        d = dict()
+        for [name, value] in attrs:
+            if value is None:  # Empty HTML attribute, as in <input selected>
+                value = ''
+            d[name] = value
+        self._builder.start(tag, d)
+    
     def handle_endtag(self, *pos, **kw):
         self._builder.end(*pos, **kw)
     def handle_data(self, *pos, **kw):
