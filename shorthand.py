@@ -30,3 +30,9 @@ def floordiv(a, b):
 
 def ceildiv(a, b):
     return -floordiv(-a, b)
+
+def read_exactly(stream, n):
+    result = stream.read(n)
+    if len(result) != n:
+        raise EOFError()
+    return result
