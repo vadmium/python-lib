@@ -415,8 +415,11 @@ def request_cached(url, msg=None, *, cache=True, cleanup, **kw):
     print("(cached)", flush=True, file=sys.stderr)
     return (msg, response)
 
-def request_decoded(*pos, **kw):
-    [header, response] = request_cached(*pos, **kw)
+def request_decoded(*pos, headers=(), **kw):
+    headers += (
+        ("Accept-Encoding", "gzip, x-gzip"),
+    )
+    [header, response] = request_cached(*pos, headers=headers, **kw)
     
     for encoding in header_list(header, "Content-Encoding"):
         if encoding.lower() in {"gzip", "x-gzip"}:
