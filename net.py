@@ -377,6 +377,8 @@ def request_cached(url, type, msg=None, *, method="GET", cleanup, **kw):
             msg.add_header("Content-Type",
                 "message/external-body; access-type=local-file",
                 name=suffix)
+            header.add_header('Status',
+                '{} {}'.format(response.status, response.reason))
             msg.attach(header)
             metadata = email.generator.BytesGenerator(metadata,
                 mangle_from_=False, maxheaderlen=0)
