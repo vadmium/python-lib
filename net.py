@@ -327,7 +327,7 @@ def http_request(url, types=None, *,
         response.close()
         raise
 
-def request_cached(url, type, msg=None, *, method="GET", cleanup, **kw):
+def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
     if msg is None:
         msg = url
     print(method, msg, end=" ", flush=True, file=sys.stderr)
@@ -345,7 +345,7 @@ def request_cached(url, type, msg=None, *, method="GET", cleanup, **kw):
     except FileNotFoundError:
         os.makedirs(dir, exist_ok=True)
         with open(metadata, "xb") as metadata:
-            response = http_request(url, (type,), method=method, **kw)
+            response = http_request(url, method=method, **kw)
             cleanup.enter_context(response)
             print(response.status, response.reason, flush=True,
                 file=sys.stderr)
