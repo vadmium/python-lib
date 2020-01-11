@@ -15,6 +15,8 @@ import hashlib
 from base64 import urlsafe_b64encode
 from email.message import Message
 import email.generator
+from io import TextIOWrapper
+from gzip import GzipFile
 
 try:  # Python 3.3
     ConnectionError
@@ -391,3 +393,26 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
     response = cleanup.enter_context(open(cache, "rb"))
     print("(cached)", flush=True, file=sys.stderr)
     return (msg, response)
+
+def request_decoded(*pos, **kw):
+    [header, response] = request_cached(*pos, **kw)
+    
+    sys.stderr.write(header.as_string())
+    for encoding in header_list(header, "Content-Encoding"):
+        if encoding.lower() in {"gzip", "x-gzip"}:
+            if isinstance(response, GzipFile):
+                raise TypeError("Recursive gzip encoding")
+            response = GzipFile(fileobj=response, mode="rb")
+        else:
+            msg = "Unhandled encoding: " + repr(encoding)
+            raise TypeError(msg)
+    return (header, response)
+
+def request_text(*pos, **kw):
+    [header, response] = request_decoded(*pos, **kw)
+    try:
+        charset = header.get_content_charset()
+        return (header, TextIOWrapper(response, charset))
+    except:
+        response.close()
+        raise
