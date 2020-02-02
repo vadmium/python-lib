@@ -1,7 +1,7 @@
 from xml.etree.ElementTree import TreeBuilder
 from html.parser import HTMLParser
 
-class HtmlTreeParser(HTMLParser):
+class HtmlParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self._builder = TreeBuilder()
