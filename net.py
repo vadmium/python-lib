@@ -334,7 +334,7 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
         msg = url
     print(method, msg, end=" ", flush=True, file=sys.stderr)
     
-    path = url.split("/")
+    path = url[:100].split("/")
     dir = os.path.join(*path[:-1])
     suffix = hashlib.md5(url.encode()).digest()[:6]
     suffix = urlsafe_b64encode(suffix).decode("ascii")
