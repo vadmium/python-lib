@@ -17,6 +17,7 @@ from email.message import Message
 import email.generator
 from io import TextIOWrapper
 from gzip import GzipFile
+import mimetypes
 
 try:  # Python 3.3
     ConnectionError
@@ -340,8 +341,7 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
     suffix = urlsafe_b64encode(suffix).decode("ascii")
     if path[-1]:
         suffix = path[-1] + os.extsep + suffix
-    suffix += os.extsep
-    metadata = os.path.join(dir, suffix + "mime")
+    metadata = os.path.join(dir, suffix + os.extsep + "mime")
     try:
         metadata = open(metadata, "rb")
     except FileNotFoundError:
@@ -365,10 +365,15 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
                 del header[field]
             
             [type, value] = header.get_params()[0]
-            suffix += {
+            ext = {
                 'text/html': 'html', 'text/javascript': 'js',
                 'application/json': 'json',
-            }[type]
+                'audio/mpeg': 'mpga',
+            }.get(type)
+            if ext is None:
+                suffix += mimetypes.guess_extension(type, strict=False)
+            else:
+                suffix += os.extsep + ext
             for encoding in header_list(header, "Content-Encoding"):
                 if encoding.lower() in {"gzip", "x-gzip"}:
                     suffix += os.extsep + "gz"
