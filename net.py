@@ -356,7 +356,7 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
             for field in header_list(header, "Connection"):
                 del header[field]
             for field in (
-                "Close", "Connection", "Content-Length", "Keep-Alive",
+                "Close", "Connection", "Keep-Alive",
                 "Proxy-Authenticate", "Proxy-Authorization",
                 "Public",
                 "Transfer-Encoding", "TE", "Trailer",
