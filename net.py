@@ -403,7 +403,6 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
 def request_decoded(*pos, **kw):
     [header, response] = request_cached(*pos, **kw)
     
-    sys.stderr.write(header.as_string())
     for encoding in header_list(header, "Content-Encoding"):
         if encoding.lower() in {"gzip", "x-gzip"}:
             if isinstance(response, GzipFile):
