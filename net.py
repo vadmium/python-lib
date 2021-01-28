@@ -365,15 +365,16 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
                 del header[field]
             
             [type, value] = header.get_params()[0]
-            ext = {
-                'text/html': 'html', 'text/javascript': 'js',
-                'application/json': 'json',
-                'audio/mpeg': 'mpga',
-            }.get(type)
-            if ext is None:
-                suffix += mimetypes.guess_extension(type, strict=False)
-            else:
-                suffix += os.extsep + ext
+            if type != 'application/octet-stream':
+                ext = {
+                    'text/html': 'html', 'text/javascript': 'js',
+                    'application/json': 'json',
+                    'audio/mpeg': 'mpga',
+                }.get(type)
+                if ext is None:
+                    suffix += mimetypes.guess_extension(type, strict=False)
+                else:
+                    suffix += os.extsep + ext
             for encoding in header_list(header, "Content-Encoding"):
                 if encoding.lower() in {"gzip", "x-gzip"}:
                     suffix += os.extsep + "gz"
