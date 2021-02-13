@@ -1,14 +1,15 @@
 from __future__ import print_function
 
 import sys
-from collections import Set
 import inspect
 from functions import setitem
 from collections import OrderedDict
 
 try:  # Python 3.3
+    from collections.abc import Set
     from inspect import signature, Parameter
 except ImportError:  # Python < 3.3
+    from collections import Set
     from collections import namedtuple
     from inspect import getargspec
     

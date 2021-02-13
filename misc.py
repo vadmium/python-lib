@@ -5,7 +5,7 @@ from functions import setitem
 from functions import Function, WrapperFunction
 from functools import partial
 import os.path
-from collections import Mapping
+from collections.abc import Mapping
 
 def wrap_import():
     global installed_wrapper
