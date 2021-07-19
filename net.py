@@ -431,11 +431,11 @@ def request_decoded(*pos, headers=(), **kw):
             raise TypeError(msg)
     return (header, response)
 
-def request_text(*pos, **kw):
+def request_text(*pos, errors=None, **kw):
     [header, response] = request_decoded(*pos, **kw)
     try:
         charset = header.get_content_charset()
-        return (header, TextIOWrapper(response, charset))
+        return (header, TextIOWrapper(response, charset, errors))
     except:
         response.close()
         raise
