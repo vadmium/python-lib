@@ -370,6 +370,7 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
                     'text/html': 'html', 'text/javascript': 'js',
                     'application/json': 'json',
                     'audio/mpeg': 'mpga',
+                    'image/jpeg': 'jpeg',
                 }.get(type)
                 if ext is None:
                     suffix += mimetypes.guess_extension(type, strict=False)
