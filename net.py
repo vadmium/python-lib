@@ -330,14 +330,24 @@ def http_request(url, types=None, *,
         response.close()
         raise
 
-def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
+def request_cached(url, msg=None, *, cleanup, **kw):
     if msg is None:
         msg = url
+    data = kw.get('data')
+    method = kw.get('method')
+    if not method:
+        method = 'GET' if data is None else 'POST'
     print(method, msg, end=" ", flush=True, file=sys.stderr)
     
     path = url[:100].split("/")
     dir = os.path.join(*path[:-1])
-    suffix = hashlib.md5(url.encode()).digest()[:6]
+    suffix = hashlib.md5()
+    if method not in {'GET', 'HEAD'}:
+        suffix.update(method.encode('ascii'))
+    suffix.update(url.encode())
+    if data is not None:
+        suffix.update(data)
+    suffix = suffix.digest()[:6]
     suffix = urlsafe_b64encode(suffix).decode("ascii")
     if path[-1]:
         suffix = path[-1] + os.extsep + suffix
@@ -347,7 +357,7 @@ def request_cached(url, msg=None, *, method="GET", cleanup, **kw):
     except FileNotFoundError:
         os.makedirs(dir, exist_ok=True)
         with open(metadata, "xb") as metadata:
-            response = http_request(url, method=method, **kw)
+            response = http_request(url, **kw)
             cleanup.enter_context(response)
             print(response.status, response.reason, flush=True,
                 file=sys.stderr)
