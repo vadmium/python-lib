@@ -330,7 +330,7 @@ def http_request(url, types=None, *,
         response.close()
         raise
 
-def request_cached(url, msg=None, *, cleanup, **kw):
+def request_cached(url, msg=None, *, cache=True, cleanup, **kw):
     if msg is None:
         msg = url
     data = kw.get('data')
@@ -339,20 +339,22 @@ def request_cached(url, msg=None, *, cleanup, **kw):
         method = 'GET' if data is None else 'POST'
     print(method, msg, end=" ", flush=True, file=sys.stderr)
     
-    path = url[:100].split("/")
-    dir = os.path.join(*path[:-1])
-    suffix = hashlib.md5()
-    if method not in {'GET', 'HEAD'}:
-        suffix.update(method.encode('ascii'))
-    suffix.update(url.encode())
-    if data is not None:
-        suffix.update(data)
-    suffix = suffix.digest()[:6]
-    suffix = urlsafe_b64encode(suffix).decode("ascii")
-    if path[-1]:
-        suffix = path[-1] + os.extsep + suffix
-    metadata = os.path.join(dir, suffix + os.extsep + "mime")
     try:
+        if not cache:
+            raise FileNotFoundError()
+        path = url[:100].split("/")
+        dir = os.path.join(*path[:-1])
+        suffix = hashlib.md5()
+        if method not in {'GET', 'HEAD'}:
+            suffix.update(method.encode('ascii'))
+        suffix.update(url.encode())
+        if data is not None:
+            suffix.update(data)
+        suffix = suffix.digest()[:6]
+        suffix = urlsafe_b64encode(suffix).decode("ascii")
+        if path[-1]:
+            suffix = path[-1] + os.extsep + suffix
+        metadata = os.path.join(dir, suffix + os.extsep + "mime")
         metadata = open(metadata, "rb")
     except FileNotFoundError:
         response = http_request(url, **kw)
@@ -361,48 +363,50 @@ def request_cached(url, msg=None, *, cleanup, **kw):
             file=sys.stderr)
         
         header = response.info()
-        for field in header_list(header, "Connection"):
-            del header[field]
-        for field in (
-            "Close", "Connection", "Keep-Alive",
-            "Proxy-Authenticate", "Proxy-Authorization",
-            "Public",
-            "Transfer-Encoding", "TE", "Trailer",
-            "Upgrade",
-        ):
-            del header[field]
-        
-        [type, value] = header.get_params()[0]
-        if type != 'application/octet-stream':
-            ext = {
-                'text/html': 'html', 'text/javascript': 'js',
-                'application/json': 'json',
-                'audio/mpeg': 'mpga',
-                'image/jpeg': 'jpeg',
-            }.get(type)
-            if ext is None:
-                suffix += mimetypes.guess_extension(type, strict=False)
-            else:
-                suffix += os.extsep + ext
-        for encoding in header_list(header, "Content-Encoding"):
-            if encoding.lower() in {"gzip", "x-gzip"}:
-                suffix += os.extsep + "gz"
-                break
-        os.makedirs(dir, exist_ok=True)
-        cache = open(os.path.join(dir, suffix), "xb")
-        cleanup.enter_context(cache)
-        msg = Message()
-        msg.add_header("Content-Type",
-            "message/external-body; access-type=local-file",
-            name=suffix)
-        header.add_header('Status',
-            '{} {}'.format(response.status, response.reason))
-        msg.attach(header)
-        with open(metadata, "xb") as metadata:
-            metadata = email.generator.BytesGenerator(metadata,
-                mangle_from_=False, maxheaderlen=0)
-            metadata.flatten(msg)
-        return (header, TeeReader(response, cache.write))
+        if cache:
+            for field in header_list(header, "Connection"):
+                del header[field]
+            for field in (
+                "Close", "Connection", "Keep-Alive",
+                "Proxy-Authenticate", "Proxy-Authorization",
+                "Public",
+                "Transfer-Encoding", "TE", "Trailer",
+                "Upgrade",
+            ):
+                del header[field]
+            
+            [type, value] = header.get_params()[0]
+            if type != 'application/octet-stream':
+                ext = {
+                    'text/html': 'html', 'text/javascript': 'js',
+                    'application/json': 'json',
+                    'audio/mpeg': 'mpga',
+                    'image/jpeg': 'jpeg',
+                }.get(type)
+                if ext is None:
+                    suffix += mimetypes.guess_extension(type, strict=False)
+                else:
+                    suffix += os.extsep + ext
+            for encoding in header_list(header, "Content-Encoding"):
+                if encoding.lower() in {"gzip", "x-gzip"}:
+                    suffix += os.extsep + "gz"
+                    break
+            os.makedirs(dir, exist_ok=True)
+            cache = open(os.path.join(dir, suffix), "xb")
+            cleanup.enter_context(cache)
+            msg = Message()
+            msg.add_header("Content-Type",
+                "message/external-body; access-type=local-file",
+                name=suffix)
+            header.add_header('Status',
+                '{} {}'.format(response.status, response.reason))
+            msg.attach(header)
+            with open(metadata, "xb") as metadata:
+                metadata = email.generator.BytesGenerator(metadata,
+                    mangle_from_=False, maxheaderlen=0)
+                metadata.flatten(msg)
+            response = TeeReader(response, cache.write)
+        return (header, response)
     with metadata:
         msg = email.message_from_binary_file(metadata)
     cache = os.path.join(dir, msg.get_param("name"))
