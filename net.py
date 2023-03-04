@@ -352,6 +352,8 @@ def request_cached(url, msg=None, *, cache=True, cleanup, **kw):
             suffix.update(data)
         suffix = suffix.digest()[:6]
         suffix = urlsafe_b64encode(suffix).decode("ascii")
+        print(suffix, end=' ', file=sys.stderr)
+        
         if path[-1]:
             suffix = path[-1] + os.extsep + suffix
         metadata = os.path.join(dir, suffix + os.extsep + "mime")
