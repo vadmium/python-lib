@@ -377,7 +377,8 @@ def request_cached(url, msg=None, *, cache=True, cleanup, **kw):
             ):
                 del header[field]
             
-            [type, value] = header.get_params()[0]
+            default = (('application/octet-stream', None),)
+            [type, value] = header.get_params(default)[0]
             if type != 'application/octet-stream':
                 ext = {
                     'text/html': 'html', 'text/javascript': 'js',
