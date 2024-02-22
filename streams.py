@@ -1,7 +1,43 @@
 from io import BufferedIOBase, IOBase
 from functions import instantiated
+from io import UnsupportedOperation
+
+class Reader(BufferedIOBase):
+    def detatch(self):
+        raise UnsupportedOperation()
+    
+    def readable(self):
+        return True
+    
+    def __next__(self):
+        result = self.readline()
+        if not result:
+            raise StopIteration()
+        return result
+    
+    def __iter__(self):
+        return self
+    
+    def readlines(self, hint=-1):
+        result = list()
+        total = 0
+        for line in self:
+            result.append(line)
+            total += len(line)
+            if hint in range(1, total):
+                break
+        return result
 
 class DelegateWriter(IOBase):
+    '''Common BufferedIOBase and TextIOBase implementation'''
+    
+    def writable(self):
+        return True
+    
+    def writelines(lines):
+        for line in lines:
+            self.write(line)
+    
     def __init__(self, *delegates):
         self.delegates = list(delegates)
     def write(self, x):
@@ -29,10 +65,7 @@ class CounterWriter(BufferedIOBase):
     def tell(self):
         return self.length
 
-class TeeReader(BufferedIOBase):
-    def readable(self):
-        return True
-    
+class TeeReader(Reader):
     def __init__(self, source, *write):
         self._source = source
         self._write = write
